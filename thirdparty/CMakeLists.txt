@@ -23,6 +23,18 @@ FetchContent_Declare(
 
 FetchContent_MakeAvailable(glm)
 
+FetchContent_Declare(
+    imgui
+    GIT_REPOSITORY  https://github.com/ocornut/imgui.git
+    GIT_TAG         2a1b69f05748ad909f03acf4533447cac1331611 #refs/tags/v1.92.6-docking
+    GIT_SHALLOW     TRUE
+    SOURCE_DIR      ${CMAKE_CURRENT_SOURCE_DIR}/imgui-cmake/imgui
+)
+
+FetchContent_MakeAvailable(imgui)
+
+add_subdirectory(imgui-cmake) # Needs building
+
 add_subdirectory(glad)
 
 add_subdirectory(stb_image)
