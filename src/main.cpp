@@ -1,10 +1,19 @@
-#include <iostream>
+// project headers
+#include "learnopengl/errorReporting.h"
+#include "learnopengl/shader.h"
+
+// third-party libraries
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
+#define GLM_ENABLE_EXPERIMENTAL
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/type_ptr.hpp>
+#include <glm/gtx/string_cast.hpp>
 #include <stb_image.h>
 
-#include "learnopengl/shader.h"
-#include "learnopengl/errorReporting.h"
+// standard library
+#include <iostream>
 
 namespace FileSystem
 {
@@ -48,7 +57,7 @@ int main()
     glViewport(0, 0, 800, 600);
 
     glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
-    
+
     int flags;
     glGetIntegerv(GL_CONTEXT_FLAGS, &flags);
     if (flags & GL_CONTEXT_FLAG_DEBUG_BIT)
@@ -60,7 +69,7 @@ int main()
 
     // Implementation
 
-    Shader ourShader("assets/shaders/textures.vert", "assets/shaders/textures.frag");
+    Shader ourShader("assets/shaders/transformations.vert", "assets/shaders/transformations.frag");
 
     unsigned int texture;
     glGenTextures(1, &texture);
@@ -71,6 +80,7 @@ int main()
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
+    stbi_set_flip_vertically_on_load(true);
     int width, height, nrChannels;
     unsigned char *data = stbi_load("assets/textures/container.jpg", &width, &height, &nrChannels, 0);
     if (data)
@@ -135,11 +145,19 @@ int main()
 
         /* Rendering */
         glClear(GL_COLOR_BUFFER_BIT);
-        ourShader.use();
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, texture);
         glBindVertexArray(VAO);
         glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+
+        // Animation
+        // GLM
+        glm::mat4 trans = glm::mat4(1.0f);
+        trans = glm::translate(trans, glm::vec3(0.5f, -0.5f, 0.0f));
+        trans = glm::rotate(trans, (float)glfwGetTime(), glm::vec3(0.0f, 0.0f, 1.0f));
+        // changing over time
+        unsigned int transformLoc = glGetUniformLocation(ourShader.ID, "transform");
+        glUniformMatrix4fv(transformLoc, 1, GL_FALSE, glm::value_ptr(trans));
 
         glfwSwapBuffers(window);
         glfwPollEvents();
