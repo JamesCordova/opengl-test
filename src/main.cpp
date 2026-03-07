@@ -163,17 +163,21 @@ int main()
         -0.5f, 0.5f, -0.5f, 0.0f, 1.0f // top face
     };
 
-    // unsigned int indices[] = {
-    //     0, 1, 3, // first triangle
-    //     1, 2, 3  // second triangle
-    // };
-
+    glm::vec3 cubePositions[] = {
+        glm::vec3(0.0f, 0.0f, 0.0f),
+        glm::vec3(2.0f, 5.0f, -15.0f),
+        glm::vec3(-1.5f, -2.2f, -2.5f),
+        glm::vec3(-3.8f, -2.0f, -12.3f),
+        glm::vec3(2.4f, -0.4f, -3.5f),
+        glm::vec3(-1.7f, 3.0f, -7.5f),
+        glm::vec3(1.3f, -2.0f, -2.5f),
+        glm::vec3(1.5f, 2.0f, -2.5f),
+        glm::vec3(1.5f, 0.2f, -1.5f),
+        glm::vec3(-1.3f, 1.0f, -1.5f)};
     unsigned int VBO;
     glGenBuffers(1, &VBO);
     unsigned int VAO;
     glGenVertexArrays(1, &VAO);
-    // unsigned int EBO;
-    // glGenBuffers(1, &EBO);
 
     glBindBuffer(GL_ARRAY_BUFFER, VBO);
     glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
@@ -216,36 +220,60 @@ int main()
     float deltaTime = 0.0f; // time between current frame and last frame
     float lastFrame = 0.0f; // time of last frame
 
+    // animation
+    float rotationSpeed = 50.0f; // degrees per second
+
     while (!glfwWindowShouldClose(window))
     {
         processInput(window);
         calculateDeltaTime(deltaTime, lastFrame);
+        // FPS counting
+        std::string currentFps = std::to_string(1.0f / deltaTime) + " FPS";
+
+        // Rendering
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, texture);
+        glBindVertexArray(VAO);
+
         // Start the Dear ImGui frame
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
         ImGui::ShowDemoWindow(); // Show demo window! :)
 
-        // show time
-        std::string currentFps = "Frames per second: " + std::to_string(1.0f / deltaTime) + " FPS";
-        std::cout << currentFps << std::endl;
+        // another
+        ImGui::Begin("Hello, world!"); // Create a window called "Hello, world!" and append into it.
+        ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
+        ImGui::Text("Calculated: %.3f ms/frame (%.1f FPS)", deltaTime * 1000.0f, 1.0f / deltaTime);
+        ImGui::SliderFloat("Rotation Speed", &rotationSpeed, 0.0f, 360.0f);
+        ImGui::End();
 
-        // Animation
-        // GLM
+        // Render boxes
+        glBindVertexArray(VAO);
+        for (unsigned int i = 1; i < 10; i++)
+        {
+            glm::mat4 model = glm::mat4(1.0f);
+            model = glm::translate(model, cubePositions[i]);
+            float angle = 20.0f * i;
+            model = glm::rotate(model, glm::radians(angle), glm::vec3(1.0f, 0.3f, 0.5f));
+            ourShader.setMat4("model", model);
+
+            glDrawArrays(GL_TRIANGLES, 0, 36);
+        }
+        // changing over time
         glm::mat4 trans = glm::mat4(1.0f);
         // trans = glm::translate(trans, glm::vec3(0.5f, -0.5f, 0.0f));
         // trans = glm::rotate(trans, (float)glfwGetTime(), glm::vec3(0.0f, 0.0f, 1.0f));
-        model = glm::rotate(model, deltaTime * glm::radians(50.0f), glm::vec3(0.5f, 1.0f, 0.0f));
+        model = glm::rotate(model, deltaTime * glm::radians(rotationSpeed), glm::vec3(0.5f, 1.0f, 0.0f));
         glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
-        // changing over time
+
         unsigned int transformLoc = glGetUniformLocation(ourShader.ID, "transform");
         glUniformMatrix4fv(transformLoc, 1, GL_FALSE, glm::value_ptr(trans));
+        // Animation
+        // GLM
 
         /* Rendering */
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, texture);
-        glBindVertexArray(VAO);
         glDrawArrays(GL_TRIANGLES, 0, 36);
 
         // Rendering
