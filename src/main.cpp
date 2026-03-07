@@ -270,10 +270,8 @@ int main()
 
         unsigned int transformLoc = glGetUniformLocation(ourShader.ID, "transform");
         glUniformMatrix4fv(transformLoc, 1, GL_FALSE, glm::value_ptr(trans));
-        // Animation
-        // GLM
 
-        /* Rendering */
+        /* Rendering the last box */
         glDrawArrays(GL_TRIANGLES, 0, 36);
 
         // Rendering
