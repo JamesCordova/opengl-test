@@ -34,8 +34,28 @@ const unsigned int SCR_WIDTH = 800;
 const unsigned int SCR_HEIGHT = 600;
 
 void framebuffer_size_callback(GLFWwindow *window, int width, int height);
+void mouse_callback(GLFWwindow *window, double xpos, double ypos);
+void scroll_callback(GLFWwindow *window, double xoffset, double yoffset);
 void processInput(GLFWwindow *window);
+void toggleCursor(GLFWwindow *window);
+void toggleWireframe(GLFWwindow *window);
 void calculateDeltaTime(float &deltaTime, float &lastFrame);
+
+// deltatime
+float deltaTime = 0.0f; // time between current frame and last frame
+float lastFrame = 0.0f; // time of last frame
+
+// mouse input
+float yaw = -90.0f; // initialize to -90.0 degrees to look along the negative z-axis
+float pitch = 0.0f;
+float fov = 45.0f;
+float lastX = SCR_WIDTH / 2.0f;
+float lastY = SCR_HEIGHT / 2.0f;
+
+// Variables
+glm::vec3 cameraPos = glm::vec3(0.0f, 0.0f, 3.0f);
+glm::vec3 cameraFront = glm::vec3(0.0f, 0.0f, -1.0f);
+glm::vec3 cameraUp = glm::vec3(0.0f, 1.0f, 0.0f);
 
 int main()
 {
@@ -62,8 +82,12 @@ int main()
     }
 
     glViewport(0, 0, 800, 600);
+    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
+    // callbacks
     glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
+    glfwSetCursorPosCallback(window, mouse_callback);
+    glfwSetScrollCallback(window, scroll_callback);
 
     int flags;
     glGetIntegerv(GL_CONTEXT_FLAGS, &flags);
@@ -201,7 +225,7 @@ int main()
     view = glm::translate(view, glm::vec3(0.0f, 0.0f, -3.0f));
 
     // Projection matrix
-    glm::mat4 projection = glm::perspective(glm::radians(45.0f), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
+    glm::mat4 projection = glm::perspective(glm::radians(fov), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
 
     // finish
 
@@ -216,12 +240,11 @@ int main()
     int projectionLoc = glGetUniformLocation(ourShader.ID, "projection");
     glUniformMatrix4fv(projectionLoc, 1, GL_FALSE, glm::value_ptr(projection));
 
-    // deltatime
-    float deltaTime = 0.0f; // time between current frame and last frame
-    float lastFrame = 0.0f; // time of last frame
-
     // animation
     float rotationSpeed = 50.0f; // degrees per second
+
+    // mouse input, set cursor to center of screen
+    glfwSetCursorPos(window, SCR_WIDTH / 2.0, SCR_HEIGHT / 2.0);
 
     while (!glfwWindowShouldClose(window))
     {
@@ -274,7 +297,14 @@ int main()
         /* Rendering the last box */
         glDrawArrays(GL_TRIANGLES, 0, 36);
 
-        // Rendering
+        // view transformation
+        view = glm::lookAt(cameraPos, cameraPos + cameraFront, cameraUp);
+        glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
+        // projection transformation
+        projection = glm::perspective(glm::radians(fov), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
+        glUniformMatrix4fv(projectionLoc, 1, GL_FALSE, glm::value_ptr(projection));
+
+        // Rendering imgui
         // (Your code clears your framebuffer, renders your other stuff etc.)
         ImGui::Render();
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
@@ -298,12 +328,95 @@ void framebuffer_size_callback(GLFWwindow *window, int width, int height)
     glViewport(0, 0, width, height);
 }
 
+void mouse_callback(GLFWwindow *window, double xpos, double ypos)
+{
+    float xoffset = xpos - lastX;
+    float yoffset = lastY - ypos; // reversed since y-coordinates go from bottom
+    lastX = xpos;
+    lastY = ypos;
+
+    const float sensitivity = 0.1f;
+    xoffset *= sensitivity;
+    yoffset *= sensitivity;
+
+    yaw += xoffset;
+    pitch += yoffset;
+
+    if (pitch > 89.0f)
+        pitch = 89.0f;
+    if (pitch < -89.0f)
+        pitch = -89.0f;
+    if (yaw > 360.0f)
+        yaw = 0.0f;
+
+    // mouse input
+    glm::vec3 direction;
+    direction.x = cos(glm::radians(yaw)) * cos(glm::radians(pitch));
+    direction.y = sin(glm::radians(pitch));
+    direction.z = sin(glm::radians(yaw)) * cos(glm::radians(pitch));
+    cameraFront = glm::normalize(direction);
+}
+
+void scroll_callback(GLFWwindow * window, double xoffset, double yoffset)
+{
+    fov -= (float)yoffset;
+    std::cout << "fov: " << fov << std::endl;
+    std::cout << "yoffset: " << yoffset << std::endl;
+    if (fov < 1.0f)
+        fov = 1.0f;
+    if (fov > 45.0f)
+        fov = 45.0f;
+}
+
 void processInput(GLFWwindow *window)
 {
     if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
     {
         glfwSetWindowShouldClose(window, true);
     }
+    const float cameraSpeed = 5.0f; // adjust accordingly
+    if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
+        cameraPos += cameraSpeed * cameraFront * deltaTime;
+    if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
+        cameraPos -= cameraSpeed * cameraFront * deltaTime;
+    if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
+        cameraPos -= glm::normalize(glm::cross(cameraFront, cameraUp)) * cameraSpeed * deltaTime;
+    if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
+        cameraPos += glm::normalize(glm::cross(cameraFront, cameraUp)) * cameraSpeed * deltaTime;
+    if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS)
+        cameraPos += cameraSpeed * cameraUp * deltaTime;
+    if (glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS)
+        cameraPos -= cameraSpeed * cameraUp * deltaTime;
+    
+    // togglers
+    toggleCursor(window);
+    toggleWireframe(window);
+
+}
+
+void toggleCursor(GLFWwindow *window)
+{
+    static bool nPrev = false;
+    if (glfwGetKey(window, GLFW_KEY_N) == GLFW_PRESS && !nPrev)
+    {
+        static bool cursor = false;
+        cursor = !cursor;
+        glfwSetInputMode(window, GLFW_CURSOR,
+                         cursor ? GLFW_CURSOR_NORMAL : GLFW_CURSOR_DISABLED);
+    }
+    nPrev = glfwGetKey(window, GLFW_KEY_N) == GLFW_PRESS;
+}
+
+void toggleWireframe(GLFWwindow *window)
+{
+    static bool mPrev = false;
+    if (glfwGetKey(window, GLFW_KEY_V) == GLFW_PRESS && !mPrev)
+    {
+        static bool wireframeMode = false;
+        wireframeMode = !wireframeMode;
+        glPolygonMode(GL_FRONT_AND_BACK, wireframeMode ? GL_LINE : GL_FILL);
+    }
+    mPrev = glfwGetKey(window, GLFW_KEY_V) == GLFW_PRESS;
 }
 
 void calculateDeltaTime(float &deltaTime, float &lastFrame)
