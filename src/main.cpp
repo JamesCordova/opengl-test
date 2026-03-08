@@ -1,4 +1,5 @@
 // project headers
+#include "learnopengl/camera.h"
 #include "learnopengl/errorReporting.h"
 #include "learnopengl/shader.h"
 
@@ -39,23 +40,21 @@ void scroll_callback(GLFWwindow *window, double xoffset, double yoffset);
 void processInput(GLFWwindow *window);
 void toggleCursor(GLFWwindow *window);
 void toggleWireframe(GLFWwindow *window);
-void calculateDeltaTime(float &deltaTime, float &lastFrame);
+void calculateDeltaTime();
 
 // deltatime
 float deltaTime = 0.0f; // time between current frame and last frame
 float lastFrame = 0.0f; // time of last frame
 
 // mouse input
-float yaw = -90.0f; // initialize to -90.0 degrees to look along the negative z-axis
-float pitch = 0.0f;
-float fov = 45.0f;
+glm::vec3 cameraPos = glm::vec3(0.0f, 0.0f, 3.0f);
+Camera camera(cameraPos);
 float lastX = SCR_WIDTH / 2.0f;
 float lastY = SCR_HEIGHT / 2.0f;
 
-// Variables
-glm::vec3 cameraPos = glm::vec3(0.0f, 0.0f, 3.0f);
-glm::vec3 cameraFront = glm::vec3(0.0f, 0.0f, -1.0f);
-glm::vec3 cameraUp = glm::vec3(0.0f, 1.0f, 0.0f);
+// state 
+bool cursorEnabled = false;
+bool wireframeEnabled = false;
 
 int main()
 {
@@ -220,12 +219,10 @@ int main()
     model = glm::rotate(model, glm::radians(-55.0f), glm::vec3(1.0f, 0.0f, 0.0f));
 
     // View matrix
-    glm::mat4 view = glm::mat4(1.0f);
-    // note that we're translating the scene in the reverse direction of where we want to move
-    view = glm::translate(view, glm::vec3(0.0f, 0.0f, -3.0f));
+    glm::mat4 view = camera.GetViewMatrix();
 
     // Projection matrix
-    glm::mat4 projection = glm::perspective(glm::radians(fov), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
+    glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
 
     // finish
 
@@ -249,7 +246,7 @@ int main()
     while (!glfwWindowShouldClose(window))
     {
         processInput(window);
-        calculateDeltaTime(deltaTime, lastFrame);
+        calculateDeltaTime();
         // FPS counting
         std::string currentFps = std::to_string(1.0f / deltaTime) + " FPS";
 
@@ -276,7 +273,7 @@ int main()
         glBindVertexArray(VAO);
         for (unsigned int i = 1; i < 10; i++)
         {
-            glm::mat4 model = glm::mat4(1.0f);
+            model = glm::mat4(1.0f);
             model = glm::translate(model, cubePositions[i]);
             float angle = 20.0f * i;
             model = glm::rotate(model, glm::radians(angle), glm::vec3(1.0f, 0.3f, 0.5f));
@@ -288,7 +285,8 @@ int main()
         glm::mat4 trans = glm::mat4(1.0f);
         // trans = glm::translate(trans, glm::vec3(0.5f, -0.5f, 0.0f));
         // trans = glm::rotate(trans, (float)glfwGetTime(), glm::vec3(0.0f, 0.0f, 1.0f));
-        model = glm::rotate(model, deltaTime * glm::radians(rotationSpeed), glm::vec3(0.5f, 1.0f, 0.0f));
+        model = glm::mat4(1.0f);
+        model = glm::rotate(model, glm::radians(static_cast<float>(glfwGetTime()) * rotationSpeed), glm::vec3(0.5f, 1.0f, 0.0f));
         glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
 
         unsigned int transformLoc = glGetUniformLocation(ourShader.ID, "transform");
@@ -298,10 +296,10 @@ int main()
         glDrawArrays(GL_TRIANGLES, 0, 36);
 
         // view transformation
-        view = glm::lookAt(cameraPos, cameraPos + cameraFront, cameraUp);
+        view = camera.GetViewMatrix();
         glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
         // projection transformation
-        projection = glm::perspective(glm::radians(fov), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
+        projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
         glUniformMatrix4fv(projectionLoc, 1, GL_FALSE, glm::value_ptr(projection));
 
         // Rendering imgui
@@ -323,71 +321,50 @@ int main()
     return 0;
 }
 
-void framebuffer_size_callback(GLFWwindow *window, int width, int height)
+void framebuffer_size_callback([[maybe_unused]] GLFWwindow *window, int width, int height)
 {
     glViewport(0, 0, width, height);
 }
 
-void mouse_callback(GLFWwindow *window, double xpos, double ypos)
+void mouse_callback([[maybe_unused]] GLFWwindow *window, double xpos, double ypos)
 {
-    float xoffset = xpos - lastX;
-    float yoffset = lastY - ypos; // reversed since y-coordinates go from bottom
-    lastX = xpos;
-    lastY = ypos;
+    if (cursorEnabled)
+    {
+         // prevent sudden jump when enabling mouse input
+        lastX = static_cast<float>(xpos);
+        lastY = static_cast<float>(ypos);
+        return;
+    }
+    float xoffset = static_cast<float>(xpos) - lastX;
+    float yoffset = lastY - static_cast<float>(ypos); // reversed since y-coordinates go from bottom
+    lastX = static_cast<float>(xpos);
+    lastY = static_cast<float>(ypos);
 
-    const float sensitivity = 0.1f;
-    xoffset *= sensitivity;
-    yoffset *= sensitivity;
-
-    yaw += xoffset;
-    pitch += yoffset;
-
-    if (pitch > 89.0f)
-        pitch = 89.0f;
-    if (pitch < -89.0f)
-        pitch = -89.0f;
-    if (yaw > 360.0f)
-        yaw = 0.0f;
-
-    // mouse input
-    glm::vec3 direction;
-    direction.x = cos(glm::radians(yaw)) * cos(glm::radians(pitch));
-    direction.y = sin(glm::radians(pitch));
-    direction.z = sin(glm::radians(yaw)) * cos(glm::radians(pitch));
-    cameraFront = glm::normalize(direction);
+    camera.ProcessMouseMovement(xoffset, yoffset);
 }
 
-void scroll_callback(GLFWwindow * window, double xoffset, double yoffset)
+void scroll_callback([[maybe_unused]] GLFWwindow *window, [[maybe_unused]] double xoffset, double yoffset)
 {
-    fov -= (float)yoffset;
-    std::cout << "fov: " << fov << std::endl;
-    std::cout << "yoffset: " << yoffset << std::endl;
-    if (fov < 1.0f)
-        fov = 1.0f;
-    if (fov > 45.0f)
-        fov = 45.0f;
+    camera.ProcessMouseScroll(static_cast<float>(yoffset));
 }
 
 void processInput(GLFWwindow *window)
 {
     if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
-    {
         glfwSetWindowShouldClose(window, true);
-    }
-    const float cameraSpeed = 5.0f; // adjust accordingly
     if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
-        cameraPos += cameraSpeed * cameraFront * deltaTime;
+        camera.ProcessKeyboard(FORWARD, deltaTime);
     if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
-        cameraPos -= cameraSpeed * cameraFront * deltaTime;
+        camera.ProcessKeyboard(BACKWARD, deltaTime);
     if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
-        cameraPos -= glm::normalize(glm::cross(cameraFront, cameraUp)) * cameraSpeed * deltaTime;
+        camera.ProcessKeyboard(LEFT, deltaTime);
     if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
-        cameraPos += glm::normalize(glm::cross(cameraFront, cameraUp)) * cameraSpeed * deltaTime;
+        camera.ProcessKeyboard(RIGHT, deltaTime);
     if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS)
-        cameraPos += cameraSpeed * cameraUp * deltaTime;
+        camera.ProcessKeyboard(UP, deltaTime);
     if (glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS)
-        cameraPos -= cameraSpeed * cameraUp * deltaTime;
-    
+        camera.ProcessKeyboard(DOWN, deltaTime);
+
     // togglers
     toggleCursor(window);
     toggleWireframe(window);
@@ -399,29 +376,27 @@ void toggleCursor(GLFWwindow *window)
     static bool nPrev = false;
     if (glfwGetKey(window, GLFW_KEY_N) == GLFW_PRESS && !nPrev)
     {
-        static bool cursor = false;
-        cursor = !cursor;
+        cursorEnabled = !cursorEnabled;
         glfwSetInputMode(window, GLFW_CURSOR,
-                         cursor ? GLFW_CURSOR_NORMAL : GLFW_CURSOR_DISABLED);
+                         cursorEnabled ? GLFW_CURSOR_NORMAL : GLFW_CURSOR_DISABLED);
     }
     nPrev = glfwGetKey(window, GLFW_KEY_N) == GLFW_PRESS;
 }
 
 void toggleWireframe(GLFWwindow *window)
 {
-    static bool mPrev = false;
-    if (glfwGetKey(window, GLFW_KEY_V) == GLFW_PRESS && !mPrev)
+    static bool vPrev = false;
+    if (glfwGetKey(window, GLFW_KEY_V) == GLFW_PRESS && !vPrev)
     {
-        static bool wireframeMode = false;
-        wireframeMode = !wireframeMode;
-        glPolygonMode(GL_FRONT_AND_BACK, wireframeMode ? GL_LINE : GL_FILL);
+        wireframeEnabled = !wireframeEnabled;
+        glPolygonMode(GL_FRONT_AND_BACK, wireframeEnabled ? GL_LINE : GL_FILL);
     }
-    mPrev = glfwGetKey(window, GLFW_KEY_V) == GLFW_PRESS;
+    vPrev = glfwGetKey(window, GLFW_KEY_V) == GLFW_PRESS;
 }
 
-void calculateDeltaTime(float &deltaTime, float &lastFrame)
+void calculateDeltaTime()
 {
-    float currentFrame = glfwGetTime();
+    float currentFrame = static_cast<float>(glfwGetTime());
     deltaTime = currentFrame - lastFrame;
     lastFrame = currentFrame;
 }
