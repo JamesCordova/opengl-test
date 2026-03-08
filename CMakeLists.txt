@@ -8,10 +8,17 @@ target_sources(${PROJECT_NAME} PRIVATE
     src/main.cpp
     src/learnopengl/shader.cpp
     src/learnopengl/errorReporting.cpp
+    src/learnopengl/camera.cpp
     )
 target_include_directories(${PROJECT_NAME} PRIVATE ./include/)
 target_compile_features(${PROJECT_NAME} PRIVATE cxx_std_17)
 target_link_libraries(${PROJECT_NAME} PRIVATE glfw GLAD stb_image glm imgui)
+
+if(MSVC)
+  target_compile_options(${PROJECT_NAME} PRIVATE /W4 /WX)
+else()
+  target_compile_options(${PROJECT_NAME} PRIVATE -Wall -Wextra -Wpedantic -Werror)
+endif()
 
 set(ASSETS_SOURCE_DIR "${CMAKE_SOURCE_DIR}/assets")
 
