@@ -120,7 +120,7 @@ int main()
     // Implementation
 
     Shader ourShader("assets/shaders/coordinateSystem.vert", "assets/shaders/coordinateSystem.frag");
-    Shader cubeShader("assets/shaders/phongLighting.vert", "assets/shaders/phongLighting.frag");
+    Shader cubeShader("assets/shaders/gouraudLighting.vert", "assets/shaders/gouraudLighting.frag");
     Shader lightingShader("assets/shaders/lightSource.vert", "assets/shaders/lightSource.frag");
 
     unsigned int texture;
