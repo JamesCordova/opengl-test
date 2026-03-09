@@ -52,9 +52,13 @@ Camera camera(cameraPos);
 float lastX = SCR_WIDTH / 2.0f;
 float lastY = SCR_HEIGHT / 2.0f;
 
-// state 
+// Game state
 bool cursorEnabled = false;
 bool wireframeEnabled = false;
+
+// Temporary variables needed
+glm::vec3 cubeColor(1.0f, 0.5f, 0.31f);
+glm::vec3 lightPos(1.2f, 1.0f, 2.0f);
 
 int main()
 {
@@ -116,6 +120,8 @@ int main()
     // Implementation
 
     Shader ourShader("assets/shaders/coordinateSystem.vert", "assets/shaders/coordinateSystem.frag");
+    Shader cubeShader("assets/shaders/colors.vert", "assets/shaders/colors.frag");
+    Shader lightingShader("assets/shaders/lightSource.vert", "assets/shaders/lightSource.frag");
 
     unsigned int texture;
     glGenTextures(1, &texture);
@@ -214,6 +220,14 @@ int main()
     glBindTexture(GL_TEXTURE_2D, texture);
     glBindVertexArray(VAO);
 
+    // lighting VAO
+    unsigned int lightVAO;
+    glGenVertexArrays(1, &lightVAO);
+    glBindVertexArray(lightVAO);
+    glBindBuffer(GL_ARRAY_BUFFER, VBO);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void *)0);
+    glEnableVertexAttribArray(0);
+
     // Model matrix
     glm::mat4 model = glm::mat4(1.0f);
     model = glm::rotate(model, glm::radians(-55.0f), glm::vec3(1.0f, 0.0f, 0.0f));
@@ -255,6 +269,7 @@ int main()
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, texture);
         glBindVertexArray(VAO);
+        ourShader.use();
 
         // Start the Dear ImGui frame
         ImGui_ImplOpenGL3_NewFrame();
@@ -267,6 +282,9 @@ int main()
         ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
         ImGui::Text("Calculated: %.3f ms/frame (%.1f FPS)", deltaTime * 1000.0f, 1.0f / deltaTime);
         ImGui::SliderFloat("Rotation Speed", &rotationSpeed, 0.0f, 360.0f);
+        ImGui::SliderFloat("Camera Speed", &camera.MovementSpeed, 0.0f, 50.0f);
+        ImGui::SliderFloat("Mouse Sensitivity", &camera.MouseSensitivity, 0.0f, 1.0f);
+        ImGui::ColorEdit3("Cube Color", (float *)&cubeColor);
         ImGui::End();
 
         // Render boxes
@@ -276,6 +294,7 @@ int main()
             model = glm::mat4(1.0f);
             model = glm::translate(model, cubePositions[i]);
             float angle = 20.0f * i;
+            model = glm::translate(model, glm::vec3(0.0f, 0.0f, -2.0f));
             model = glm::rotate(model, glm::radians(angle), glm::vec3(1.0f, 0.3f, 0.5f));
             ourShader.setMat4("model", model);
 
@@ -286,6 +305,7 @@ int main()
         // trans = glm::translate(trans, glm::vec3(0.5f, -0.5f, 0.0f));
         // trans = glm::rotate(trans, (float)glfwGetTime(), glm::vec3(0.0f, 0.0f, 1.0f));
         model = glm::mat4(1.0f);
+        model = glm::translate(model, glm::vec3(0.0f, 0.0f, -2.0f));
         model = glm::rotate(model, glm::radians(static_cast<float>(glfwGetTime()) * rotationSpeed), glm::vec3(0.5f, 1.0f, 0.0f));
         glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
 
@@ -301,6 +321,36 @@ int main()
         // projection transformation
         projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
         glUniformMatrix4fv(projectionLoc, 1, GL_FALSE, glm::value_ptr(projection));
+
+        // cube color
+        cubeShader.use();
+        cubeShader.setVec3("objectColor", cubeColor.x, cubeColor.y, cubeColor.z);
+        cubeShader.setVec3("lightColor", 1.0f, 1.0f, 1.0f);
+        // model transformation
+        model = glm::mat4(1.0f);
+        cubeShader.setMat4("model", model);
+        // view transformation
+        cubeShader.setMat4("view", view);
+        // projection transformation
+        cubeShader.setMat4("projection", projection);
+
+        glBindVertexArray(lightVAO);
+        glDrawArrays(GL_TRIANGLES, 0, 36);
+
+        // lightcube
+        lightingShader.use();
+        // light model transformation
+        model = glm::mat4(1.0f);
+        model = glm::translate(model, lightPos);
+        model = glm::scale(model, glm::vec3(0.2f));
+        lightingShader.setMat4("model", model);
+        // light view transformation
+        lightingShader.setMat4("view", view);
+        // light projection transformation
+        lightingShader.setMat4("projection", projection);
+
+        glBindVertexArray(lightVAO);
+        glDrawArrays(GL_TRIANGLES, 0, 36);
 
         // Rendering imgui
         // (Your code clears your framebuffer, renders your other stuff etc.)
@@ -330,7 +380,7 @@ void mouse_callback([[maybe_unused]] GLFWwindow *window, double xpos, double ypo
 {
     if (cursorEnabled)
     {
-         // prevent sudden jump when enabling mouse input
+        // prevent sudden jump when enabling mouse input
         lastX = static_cast<float>(xpos);
         lastY = static_cast<float>(ypos);
         return;
@@ -345,6 +395,8 @@ void mouse_callback([[maybe_unused]] GLFWwindow *window, double xpos, double ypo
 
 void scroll_callback([[maybe_unused]] GLFWwindow *window, [[maybe_unused]] double xoffset, double yoffset)
 {
+    if (cursorEnabled)
+        return;
     camera.ProcessMouseScroll(static_cast<float>(yoffset));
 }
 
@@ -368,7 +420,6 @@ void processInput(GLFWwindow *window)
     // togglers
     toggleCursor(window);
     toggleWireframe(window);
-
 }
 
 void toggleCursor(GLFWwindow *window)
