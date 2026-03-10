@@ -121,11 +121,13 @@ int main()
     // Implementation
 
     Shader ourShader("assets/shaders/coordinateSystem.vert", "assets/shaders/coordinateSystem.frag");
-    Shader cubeShader("assets/shaders/materials.vert", "assets/shaders/materials.frag");
+    // Shader cubeShader("assets/shaders/materials.vert", "assets/shaders/materials.frag");
+    Shader cubeShader("assets/shaders/lightingMaps.vert", "assets/shaders/lightingMaps.frag");
     Shader lightingShader("assets/shaders/lightSource.vert", "assets/shaders/lightSource.frag");
 
     stbi_set_flip_vertically_on_load(true);
-    unsigned int texture = loadTexture("assets/textures/container.jpg");
+    unsigned int container1 = loadTexture("assets/textures/container.jpg");
+    unsigned int container2 = loadTexture("assets/textures/container2.png");
     // mesh
     float vertices[] = {
         // positions          // normals           // texture coords
@@ -197,7 +199,7 @@ int main()
     glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void *)(6 * sizeof(float)));
     glEnableVertexAttribArray(1);
 
-    glBindTexture(GL_TEXTURE_2D, texture);
+    glBindTexture(GL_TEXTURE_2D, container1);
     glBindVertexArray(VAO);
 
     // lighting VAO
@@ -268,7 +270,7 @@ int main()
         // Rendering
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, texture);
+        glBindTexture(GL_TEXTURE_2D, container1);
         glBindVertexArray(VAO);
         ourShader.use();
 
@@ -331,9 +333,11 @@ int main()
 
         // cube color
         cubeShader.use();
+        // Textures
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, container2);
         // material properties
-        cubeShader.setVec3("material.ambient", cubeAmbientColor);
-        cubeShader.setVec3("material.diffuse", cubeDiffuseColor);
+        cubeShader.setInt("material.diffuse", 0);
         cubeShader.setVec3("material.specular", cubeSpecularColor);
         cubeShader.setFloat("material.shininess", shininess);
         // light received
@@ -475,7 +479,7 @@ unsigned int loadTexture(const char *path)
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
         // load texture data
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
+        glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format, GL_UNSIGNED_BYTE, data);
         glGenerateMipmap(GL_TEXTURE_2D);
     }
     else
