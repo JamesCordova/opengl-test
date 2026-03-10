@@ -128,6 +128,7 @@ int main()
     stbi_set_flip_vertically_on_load(true);
     unsigned int container1 = loadTexture("assets/textures/container.jpg");
     unsigned int container2 = loadTexture("assets/textures/container2.png");
+    unsigned int container2_specular = loadTexture("assets/textures/container2_specular.png");
     // mesh
     float vertices[] = {
         // positions          // normals           // texture coords
@@ -336,9 +337,11 @@ int main()
         // Textures
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, container2);
+        glActiveTexture(GL_TEXTURE1);
+        glBindTexture(GL_TEXTURE_2D, container2_specular);
         // material properties
         cubeShader.setInt("material.diffuse", 0);
-        cubeShader.setVec3("material.specular", cubeSpecularColor);
+        cubeShader.setInt("material.specular", 1);
         cubeShader.setFloat("material.shininess", shininess);
         // light received
         cubeShader.setVec3("light.ambient", lightAmbientColor);
