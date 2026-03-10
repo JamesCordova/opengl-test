@@ -59,7 +59,9 @@ bool wireframeEnabled = false;
 
 // Temporary variables needed
 glm::vec3 cubeColor(1.0f, 0.5f, 0.31f);
+// light things
 glm::vec3 lightPos(1.2f, 1.0f, 2.0f);
+glm::vec3 lightDirection(-0.2f, -1.0f, -0.3f);
 
 int main()
 {
@@ -286,7 +288,7 @@ int main()
         ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
         ImGui::Text("Calculated: %.3f ms/frame (%.1f FPS)", deltaTime * 1000.0f, 1.0f / deltaTime);
         ImGui::SliderFloat("Rotation Speed", &rotationSpeed, 0.0f, 360.0f);
-        ImGui::SliderFloat("Camera Speed", &camera.MovementSpeed, 0.0f, 50.0f);
+        ImGui::SliderFloat("Camera Speed", &camera.MovementSpeed, 0.0f, 250.0f);
         ImGui::SliderFloat("Mouse Sensitivity", &camera.MouseSensitivity, 0.0f, 1.0f);
         ImGui::ColorEdit3("Cube Color", (float *)&cubeColor);
         ImGui::SliderFloat3("Cube position", (float *)&cubePos, -20.0f, 20.0f);
@@ -295,6 +297,8 @@ int main()
         ImGui::ColorEdit3("Diffuse Color", (float *)&cubeDiffuseColor);
         ImGui::ColorEdit3("Specular Color", (float *)&cubeSpecularColor);
         ImGui::SliderFloat("Shininess", &shininess, 1.0f, 256.0f);
+        ImGui::Text("Light properties:");
+        ImGui::SliderFloat3("Light direction", (float *)&lightDirection, -1.0f, 1.0f);
         ImGui::End();
 
         // Render boxes
@@ -349,7 +353,8 @@ int main()
         cubeShader.setVec3("light.specular", lightSpecularColor);
         // lighting properties
         cubeShader.setVec3("lightColor", 1.0f, 1.0f, 1.0f);
-        cubeShader.setVec3("lightPos", lightPos.x, lightPos.y, lightPos.z);
+        cubeShader.setVec3("light.direction", lightDirection);
+        // cubeShader.setVec3("light.position", lightPos);
         cubeShader.setVec3("viewPos", camera.Position.x, camera.Position.y, camera.Position.z);
         // model transformation
         model = glm::mat4(1.0f);
@@ -364,6 +369,7 @@ int main()
         for (int i = 0; i < 10; i++)
         {
             model = glm::mat4(1.0f);
+            model = glm::translate(model, cubePos);
             model = glm::translate(model, glm::vec3(0.0f + (i % 3) + ((i % 3) * 0.2f), 0.0f + floor(i / 3) + (floor(i / 3) * 0.2f), 0.0f));
             cubeShader.setMat4("model", model);
             glBindVertexArray(cubeVAO);
