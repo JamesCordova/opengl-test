@@ -120,7 +120,7 @@ int main()
     // Implementation
 
     Shader ourShader("assets/shaders/coordinateSystem.vert", "assets/shaders/coordinateSystem.frag");
-    Shader cubeShader("assets/shaders/phongLighting.vert", "assets/shaders/phongLighting.frag");
+    Shader cubeShader("assets/shaders/materials.vert", "assets/shaders/materials.frag");
     Shader lightingShader("assets/shaders/lightSource.vert", "assets/shaders/lightSource.frag");
 
     unsigned int texture;
@@ -238,6 +238,14 @@ int main()
     glEnableVertexAttribArray(1);
     // position
     glm::vec3 cubePos(0.0f, 0.0f, 0.0f);
+    glm::vec3 cubeAmbientColor(1.0f, 0.5f, 0.31f);
+    glm::vec3 cubeDiffuseColor(1.0f, 0.5f, 0.31f);
+    glm::vec3 cubeSpecularColor(0.5f, 0.5f, 0.5f);
+    float shininess = 32.0f;
+    // for lighting
+    glm::vec3 lightAmbientColor(0.2f, 0.2f, 0.2f);
+    glm::vec3 lightDiffuseColor(0.5f, 0.5f, 0.5f);
+    glm::vec3 lightSpecularColor(1.0f, 1.0f, 1.0f);
 
     // Model matrix
     glm::mat4 model = glm::mat4(1.0f);
@@ -297,6 +305,11 @@ int main()
         ImGui::SliderFloat("Mouse Sensitivity", &camera.MouseSensitivity, 0.0f, 1.0f);
         ImGui::ColorEdit3("Cube Color", (float *)&cubeColor);
         ImGui::SliderFloat3("Cube position", (float *)&cubePos, -20.0f, 20.0f);
+        // 3 coloredits and 1 slider float
+        ImGui::ColorEdit3("Ambient Color", (float *)&cubeAmbientColor);
+        ImGui::ColorEdit3("Diffuse Color", (float *)&cubeDiffuseColor);
+        ImGui::ColorEdit3("Specular Color", (float *)&cubeSpecularColor);
+        ImGui::SliderFloat("Shininess", &shininess, 1.0f, 256.0f);
         ImGui::End();
 
         // Render boxes
@@ -336,7 +349,16 @@ int main()
 
         // cube color
         cubeShader.use();
-        cubeShader.setVec3("objectColor", cubeColor.x, cubeColor.y, cubeColor.z);
+        // material properties
+        cubeShader.setVec3("material.ambient", cubeAmbientColor);
+        cubeShader.setVec3("material.diffuse", cubeDiffuseColor);
+        cubeShader.setVec3("material.specular", cubeSpecularColor);
+        cubeShader.setFloat("material.shininess", shininess);
+        // light received
+        cubeShader.setVec3("light.ambient", lightAmbientColor);
+        cubeShader.setVec3("light.diffuse", lightDiffuseColor);
+        cubeShader.setVec3("light.specular", lightSpecularColor);
+        // lighting properties
         cubeShader.setVec3("lightColor", 1.0f, 1.0f, 1.0f);
         cubeShader.setVec3("lightPos", lightPos.x, lightPos.y, lightPos.z);
         cubeShader.setVec3("viewPos", camera.Position.x, camera.Position.y, camera.Position.z);
