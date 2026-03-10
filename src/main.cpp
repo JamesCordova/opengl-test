@@ -62,6 +62,9 @@ glm::vec3 cubeColor(1.0f, 0.5f, 0.31f);
 // light things
 glm::vec3 lightPos(1.2f, 1.0f, 2.0f);
 glm::vec3 lightDirection(-0.2f, -1.0f, -0.3f);
+float lightConstant = 1.0f;
+float lightLinear = 0.09f;
+float lightQuadratic = 0.032f;
 
 int main()
 {
@@ -299,6 +302,9 @@ int main()
         ImGui::SliderFloat("Shininess", &shininess, 1.0f, 256.0f);
         ImGui::Text("Light properties:");
         ImGui::SliderFloat3("Light direction", (float *)&lightDirection, -1.0f, 1.0f);
+        ImGui::InputFloat("Light constant", &lightConstant);
+        ImGui::InputFloat("Light linear", &lightLinear);
+        ImGui::InputFloat("Light quadratic", &lightQuadratic);
         ImGui::End();
 
         // Render boxes
@@ -351,10 +357,13 @@ int main()
         cubeShader.setVec3("light.ambient", lightAmbientColor);
         cubeShader.setVec3("light.diffuse", lightDiffuseColor);
         cubeShader.setVec3("light.specular", lightSpecularColor);
+        cubeShader.setFloat("light.constant", lightConstant);
+        cubeShader.setFloat("light.linear", lightLinear);
+        cubeShader.setFloat("light.quadratic", lightQuadratic);
         // lighting properties
         cubeShader.setVec3("lightColor", 1.0f, 1.0f, 1.0f);
-        cubeShader.setVec3("light.direction", lightDirection);
-        // cubeShader.setVec3("light.position", lightPos);
+        // cubeShader.setVec3("light.direction", lightDirection);
+        cubeShader.setVec3("light.position", lightPos);
         cubeShader.setVec3("viewPos", camera.Position.x, camera.Position.y, camera.Position.z);
         // model transformation
         model = glm::mat4(1.0f);
