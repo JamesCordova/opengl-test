@@ -31,33 +31,36 @@ namespace FileSystem
     }
 }
 
-// settings
-const unsigned int SCR_WIDTH = 800;
-const unsigned int SCR_HEIGHT = 600;
 
 void framebuffer_size_callback(GLFWwindow *window, int width, int height);
 void mouse_callback(GLFWwindow *window, double xpos, double ypos);
 void scroll_callback(GLFWwindow *window, double xoffset, double yoffset);
 void processInput(GLFWwindow *window);
 unsigned int loadTexture(const char *path);
+
 void toggleCursor(GLFWwindow *window);
 void toggleWireframe(GLFWwindow *window);
 void calculateDeltaTime();
 
-// deltatime
-float deltaTime = 0.0f; // time between current frame and last frame
-float lastFrame = 0.0f; // time of last frame
+// settings
+const unsigned int SCR_WIDTH = 800;
+const unsigned int SCR_HEIGHT = 600;
 
-// mouse input
+// Camera
 glm::vec3 cameraPos = glm::vec3(0.0f, 0.0f, 3.0f);
 Camera camera(cameraPos);
 float lastX = SCR_WIDTH / 2.0f;
 float lastY = SCR_HEIGHT / 2.0f;
 
+// deltatime
+float deltaTime = 0.0f; // time between current frame and last frame
+float lastFrame = 0.0f; // time of last frame
+
 // Game state
 bool cursorEnabled = false;
 bool wireframeEnabled = false;
 
+////////////////
 // Temporary variables needed
 glm::vec3 cubeColor(1.0f, 0.5f, 0.31f);
 // light things
@@ -68,6 +71,7 @@ float lightLinear = 0.09f;
 float lightQuadratic = 0.032f;
 float flashlightInnerCutoff = 12.5f;
 float flashlightOuterCutoff = 17.5f;
+//////////////////
 
 int main()
 {
@@ -87,6 +91,12 @@ int main()
         return -1;
     }
     glfwMakeContextCurrent(window);
+    // callbacks
+    glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
+    glfwSetCursorPosCallback(window, mouse_callback);
+    glfwSetScrollCallback(window, scroll_callback);
+    
+    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
     if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
     {
@@ -94,21 +104,8 @@ int main()
         return -1;
     }
 
-    glViewport(0, 0, 800, 600);
-    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-
-    // callbacks
-    glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
-    glfwSetCursorPosCallback(window, mouse_callback);
-    glfwSetScrollCallback(window, scroll_callback);
-
-    int flags;
-    glGetIntegerv(GL_CONTEXT_FLAGS, &flags);
-    if (flags & GL_CONTEXT_FLAG_DEBUG_BIT)
-    {
-        enableReportGlErrors();
-    }
-
+    enableReportGlErrors();
+    
     // Configure global opengl state
     glEnable(GL_DEPTH_TEST);
     // Test output
