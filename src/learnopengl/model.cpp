@@ -149,10 +149,26 @@ std::vector<Texture> Model::loadMaterialTextures(aiMaterial *mat, aiTextureType 
     {
         aiString str;
         mat->GetTexture(type, i, &str);
-        Texture texture;
-        texture.id = TextureFromFile(str.C_Str(), directory);
-        texture.type = typeName;
-        textures.push_back(texture);
+        bool isNewTexture = true;
+        for (unsigned int j = 0; j < textures_loaded.size(); j++)
+        {
+            if (std::strcmp(textures_loaded[j].path.data(), str.C_Str()) == 0)
+            {
+                textures.push_back(textures_loaded[j]);
+                isNewTexture = false;
+                break;
+            }
+        }
+        if (isNewTexture)
+        {
+            Texture texture;
+            texture.id = TextureFromFile(str.C_Str(), directory);
+            texture.type = typeName;
+            texture.path = str.C_Str();
+            textures.push_back(texture);
+            textures_loaded.push_back(texture);
+
+        }
     }
 
     return textures;
