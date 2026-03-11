@@ -9,6 +9,7 @@ target_sources(${PROJECT_NAME} PRIVATE
     src/learnopengl/shader.cpp
     src/learnopengl/errorReporting.cpp
     src/learnopengl/camera.cpp
+    src/learnopengl/mesh.cpp
     )
 target_include_directories(${PROJECT_NAME} PRIVATE ./include/)
 target_compile_features(${PROJECT_NAME} PRIVATE cxx_std_17)
