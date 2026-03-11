@@ -128,7 +128,7 @@ int main()
 
     // Implementation
 
-    Shader ourShader("assets/shaders/modelsSimple.vert", "assets/shaders/modelsSimple.frag");
+    Shader ourShader("assets/shaders/modelLight.vert", "assets/shaders/modelLight.frag");
     // Shader cubeShader("assets/shaders/materials.vert", "assets/shaders/materials.frag");
     // Shader cubeShader("assets/shaders/lightingMaps.vert", "assets/shaders/lightingMaps.frag");
     Shader cubeShader("assets/shaders/multipleLights.vert", "assets/shaders/multipleLights.frag");
@@ -137,6 +137,12 @@ int main()
     stbi_set_flip_vertically_on_load(true);
     // mesh
     Model ourModel("assets/objects/backpack/backpack.obj");
+
+    glm::vec3 lightPositions[] = {
+        glm::vec3(0.7f, 0.2f, 2.0f),
+        glm::vec3(2.3f, -3.3f, -4.0f),
+        glm::vec3(-4.0f, 2.0f, -12.0f),
+        glm::vec3(0.0f, 0.0f, -3.0f)};
 
     // Model matrix
     glm::mat4 model = glm::mat4(1.0f);
@@ -214,26 +220,58 @@ int main()
         model = glm::translate(model, glm::vec3(0.0f, 0.0f, -2.0f));
         model = glm::rotate(model, glm::radians(static_cast<float>(glfwGetTime()) * rotationSpeed), glm::vec3(0.5f, 1.0f, 0.0f));
         glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
-
+        
         unsigned int transformLoc = glGetUniformLocation(ourShader.ID, "transform");
         glUniformMatrix4fv(transformLoc, 1, GL_FALSE, glm::value_ptr(trans));
-
+        
         /* Rendering the last box */
         ourModel.Draw(ourShader);
-
+        // material properties
+        ourShader.setFloat("material.shininess", 32.0f);
+        
         // view transformation
         view = camera.GetViewMatrix();
         glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
         // projection transformation
         projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
-        glUniformMatrix4fv(projectionLoc, 1, GL_FALSE, glm::value_ptr(projection));
-
+        ourShader.setMat4("projection", projection);
+        // lighting
+        ourShader.setVec3("viewPos", camera.Position);
+        // directional light
+        ourShader.setVec3("directionalLight.direction", lightDirection);
+        ourShader.setVec3("directionalLight.ambient", 0.05f, 0.05f, 0.05f);
+        ourShader.setVec3("directionalLight.diffuse", 0.4f, 0.4f, 0.4f);
+        ourShader.setVec3("directionalLight.specular", 0.5f, 0.5f, 0.5f);
+        // point lights loop
+        for (int i = 0; i < 4; i++)
+        {
+            std::string number = std::to_string(i);
+            ourShader.setVec3("pointLight[" + number + "].position", lightPositions[i]);
+            ourShader.setVec3("pointLight[" + number + "].ambient", 0.05f, 0.05f, 0.05f);
+            ourShader.setVec3("pointLight[" + number + "].diffuse", 0.8f, 0.8f, 0.8f);
+            ourShader.setVec3("pointLight[" + number + "].specular", 1.0f, 1.0f, 1.0f);
+            ourShader.setFloat("pointLight[" + number + "].constant", lightConstant);
+            ourShader.setFloat("pointLight[" + number + "].linear", lightLinear);
+            ourShader.setFloat("pointLight[" + number + "].quadratic", lightQuadratic);
+        }
+        // spotlight
+        ourShader.setVec3("spotLight.position", camera.Position);
+        ourShader.setVec3("spotLight.direction", camera.Front);
+        ourShader.setFloat("spotLight.innerCutoff", glm::cos(glm::radians(flashlightInnerCutoff)));
+        ourShader.setFloat("spotLight.outerCutoff", glm::cos(glm::radians(flashlightOuterCutoff)));
+        ourShader.setVec3("spotLight.ambient", 0.0f, 0.0f, 0.0f);
+        ourShader.setVec3("spotLight.diffuse", 1.0f, 1.0f, 1.0f);
+        ourShader.setVec3("spotLight.specular", 1.0f, 1.0f, 1.0f);
+        ourShader.setFloat("spotLight.constant", lightConstant);
+        ourShader.setFloat("spotLight.linear", lightLinear);
+        ourShader.setFloat("spotLight.quadratic", lightQuadratic);
+        
         // Rendering imgui
         // (Your code clears your framebuffer, renders your other stuff etc.)
         ImGui::Render();
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
         // (Your code calls glfwSwapBuffers() etc.)
-
+        
         glfwSwapBuffers(window);
         glfwPollEvents();
     }
