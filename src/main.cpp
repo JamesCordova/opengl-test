@@ -128,7 +128,7 @@ int main()
 
     // Implementation
 
-    Shader ourShader("assets/shaders/models.vert", "assets/shaders/models.frag");
+    Shader ourShader("assets/shaders/modelsSimple.vert", "assets/shaders/modelsSimple.frag");
     // Shader cubeShader("assets/shaders/materials.vert", "assets/shaders/materials.frag");
     // Shader cubeShader("assets/shaders/lightingMaps.vert", "assets/shaders/lightingMaps.frag");
     Shader cubeShader("assets/shaders/multipleLights.vert", "assets/shaders/multipleLights.frag");
