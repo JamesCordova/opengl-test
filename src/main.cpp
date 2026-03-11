@@ -31,7 +31,6 @@ namespace FileSystem
     }
 }
 
-
 void framebuffer_size_callback(GLFWwindow *window, int width, int height);
 void mouse_callback(GLFWwindow *window, double xpos, double ypos);
 void scroll_callback(GLFWwindow *window, double xoffset, double yoffset);
@@ -41,6 +40,12 @@ unsigned int loadTexture(const char *path);
 void toggleCursor(GLFWwindow *window);
 void toggleWireframe(GLFWwindow *window);
 void calculateDeltaTime();
+// For ImGui
+void imgui_frame_init(GLFWwindow *window);
+void imgui_frame_update();
+void imgui_frame_new();
+void imgui_frame_render();
+void imgui_frame_shutdown();
 
 // settings
 const unsigned int SCR_WIDTH = 800;
@@ -62,6 +67,9 @@ bool wireframeEnabled = false;
 
 ////////////////
 // Temporary variables needed
+// animation
+float rotationSpeed = 50.0f; // degrees per second
+
 glm::vec3 cubeColor(1.0f, 0.5f, 0.31f);
 // light things
 glm::vec3 lightPos(1.2f, 1.0f, 2.0f);
@@ -95,7 +103,7 @@ int main()
     glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
     glfwSetCursorPosCallback(window, mouse_callback);
     glfwSetScrollCallback(window, scroll_callback);
-    
+
     glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
     if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
@@ -105,69 +113,112 @@ int main()
     }
 
     enableReportGlErrors();
-    
+
     // Configure global opengl state
     glEnable(GL_DEPTH_TEST);
     // Test output
     std::cout << "Hello, OpenGL!" << std::endl;
 
     // Imgui setup
-    // Setup Dear ImGui context
-    IMGUI_CHECKVERSION();
-    ImGui::CreateContext();
-    ImGuiIO &io = ImGui::GetIO();
-    io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard; // Enable Keyboard Controls
-    io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;  // Enable Gamepad Controls
-    io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;     // IF using Docking Branch
-
-    // Setup Platform/Renderer backends
-    ImGui_ImplGlfw_InitForOpenGL(window, true); // Second param install_callback=true will install GLFW callbacks and chain to existing ones.
-    ImGui_ImplOpenGL3_Init();
+    imgui_frame_init(window);
 
     // Implementation
+    Shader shader("assets/shaders/depthTesting.vert", "assets/shaders/depthTesting.frag");
 
-    Shader ourShader("assets/shaders/modelLight.vert", "assets/shaders/modelLight.frag");
-    // Shader cubeShader("assets/shaders/materials.vert", "assets/shaders/materials.frag");
-    // Shader cubeShader("assets/shaders/lightingMaps.vert", "assets/shaders/lightingMaps.frag");
-    Shader cubeShader("assets/shaders/multipleLights.vert", "assets/shaders/multipleLights.frag");
-    Shader lightingShader("assets/shaders/lightSource.vert", "assets/shaders/lightSource.frag");
+    float cubeVertices[] = {
+        // positions          // texture Coords
+        -0.5f, -0.5f, -0.5f, 0.0f, 0.0f,
+        0.5f, -0.5f, -0.5f, 1.0f, 0.0f,
+        0.5f, 0.5f, -0.5f, 1.0f, 1.0f,
+        0.5f, 0.5f, -0.5f, 1.0f, 1.0f,
+        -0.5f, 0.5f, -0.5f, 0.0f, 1.0f,
+        -0.5f, -0.5f, -0.5f, 0.0f, 0.0f,
 
+        -0.5f, -0.5f, 0.5f, 0.0f, 0.0f,
+        0.5f, -0.5f, 0.5f, 1.0f, 0.0f,
+        0.5f, 0.5f, 0.5f, 1.0f, 1.0f,
+        0.5f, 0.5f, 0.5f, 1.0f, 1.0f,
+        -0.5f, 0.5f, 0.5f, 0.0f, 1.0f,
+        -0.5f, -0.5f, 0.5f, 0.0f, 0.0f,
+
+        -0.5f, 0.5f, 0.5f, 1.0f, 0.0f,
+        -0.5f, 0.5f, -0.5f, 1.0f, 1.0f,
+        -0.5f, -0.5f, -0.5f, 0.0f, 1.0f,
+        -0.5f, -0.5f, -0.5f, 0.0f, 1.0f,
+        -0.5f, -0.5f, 0.5f, 0.0f, 0.0f,
+        -0.5f, 0.5f, 0.5f, 1.0f, 0.0f,
+
+        0.5f, 0.5f, 0.5f, 1.0f, 0.0f,
+        0.5f, 0.5f, -0.5f, 1.0f, 1.0f,
+        0.5f, -0.5f, -0.5f, 0.0f, 1.0f,
+        0.5f, -0.5f, -0.5f, 0.0f, 1.0f,
+        0.5f, -0.5f, 0.5f, 0.0f, 0.0f,
+        0.5f, 0.5f, 0.5f, 1.0f, 0.0f,
+
+        -0.5f, -0.5f, -0.5f, 0.0f, 1.0f,
+        0.5f, -0.5f, -0.5f, 1.0f, 1.0f,
+        0.5f, -0.5f, 0.5f, 1.0f, 0.0f,
+        0.5f, -0.5f, 0.5f, 1.0f, 0.0f,
+        -0.5f, -0.5f, 0.5f, 0.0f, 0.0f,
+        -0.5f, -0.5f, -0.5f, 0.0f, 1.0f,
+
+        -0.5f, 0.5f, -0.5f, 0.0f, 1.0f,
+        0.5f, 0.5f, -0.5f, 1.0f, 1.0f,
+        0.5f, 0.5f, 0.5f, 1.0f, 0.0f,
+        0.5f, 0.5f, 0.5f, 1.0f, 0.0f,
+        -0.5f, 0.5f, 0.5f, 0.0f, 0.0f,
+        -0.5f, 0.5f, -0.5f, 0.0f, 1.0f};
+
+    float planeVertices[] = {
+        // positions          // texture Coords (note we set these higher than 1 (together with GL_REPEAT as texture wrapping mode). this will cause the floor texture to repeat)
+        5.0f, -0.5f, 5.0f, 2.0f, 0.0f,
+        -5.0f, -0.5f, 5.0f, 0.0f, 0.0f,
+        -5.0f, -0.5f, -5.0f, 0.0f, 2.0f,
+
+        5.0f, -0.5f, 5.0f, 2.0f, 0.0f,
+        -5.0f, -0.5f, -5.0f, 0.0f, 2.0f,
+        5.0f, -0.5f, -5.0f, 2.0f, 2.0f};
+
+    // cubeVAO
+    unsigned int cubeVAO, cubeVBO;
+    glGenVertexArrays(1, &cubeVAO);
+    glGenBuffers(1, &cubeVBO);
+    glBindVertexArray(cubeVAO);
+    glBindBuffer(GL_ARRAY_BUFFER, cubeVBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(cubeVertices), &cubeVertices, GL_STATIC_DRAW);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void *)0);
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void *)(3 * sizeof(float)));
+    glBindVertexArray(0);
+    // plane VAO
+    unsigned int planeVAO, planeVBO;
+    glGenVertexArrays(1, &planeVAO);
+    glGenBuffers(1, &planeVBO);
+    glBindVertexArray(planeVAO);
+    glBindBuffer(GL_ARRAY_BUFFER, planeVBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(planeVertices), &planeVertices, GL_STATIC_DRAW);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void *)0);
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void *)(3 * sizeof(float)));
+    glBindVertexArray(0);
+
+    // Load Textures
     stbi_set_flip_vertically_on_load(true);
-    // mesh
-    Model ourModel("assets/objects/backpack/backpack.obj");
+    unsigned int cubeTexture = loadTexture("assets/textures/marble.jpg");
+    unsigned int floorTexture = loadTexture("assets/textures/metal.png");
 
-    glm::vec3 lightPositions[] = {
-        glm::vec3(0.7f, 0.2f, 2.0f),
-        glm::vec3(2.3f, -3.3f, -4.0f),
-        glm::vec3(-4.0f, 2.0f, -12.0f),
-        glm::vec3(0.0f, 0.0f, -3.0f)};
-
-    // Model matrix
-    glm::mat4 model = glm::mat4(1.0f);
-    model = glm::rotate(model, glm::radians(-55.0f), glm::vec3(1.0f, 0.0f, 0.0f));
-
-    // View matrix
-    glm::mat4 view = camera.GetViewMatrix();
-
-    // Projection matrix
-    glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
+    // Shader configuration
+    shader.use();
+    shader.setInt("texture1", 0);
 
     // finish
-
-    glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
-    ourShader.use();
     // set the model, view, and projection matrices in the shader
-    int modelLoc = glGetUniformLocation(ourShader.ID, "model");
-    glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
-    int viewLoc = glGetUniformLocation(ourShader.ID, "view");
-    glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
-    int projectionLoc = glGetUniformLocation(ourShader.ID, "projection");
-    glUniformMatrix4fv(projectionLoc, 1, GL_FALSE, glm::value_ptr(projection));
 
-    // animation
-    float rotationSpeed = 50.0f; // degrees per second
 
     // mouse input, set cursor to center of screen
+    glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glfwSwapBuffers(window);
     glfwShowWindow(window);
@@ -180,110 +231,59 @@ int main()
     {
         processInput(window);
         calculateDeltaTime();
-        // FPS counting
-        std::string currentFps = std::to_string(1.0f / deltaTime) + " FPS";
-
         // Rendering
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-        ourShader.use();
 
-        // Start the Dear ImGui frame
-        ImGui_ImplOpenGL3_NewFrame();
-        ImGui_ImplGlfw_NewFrame();
-        ImGui::NewFrame();
-        ImGui::ShowDemoWindow(); // Show demo window! :)
-
-        // another
-        ImGui::Begin("Hello, world!"); // Create a window called "Hello, world!" and append into it.
-        ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
-        ImGui::Text("Calculated: %.3f ms/frame (%.1f FPS)", deltaTime * 1000.0f, 1.0f / deltaTime);
-        ImGui::SliderFloat("Rotation Speed", &rotationSpeed, 0.0f, 360.0f);
-        ImGui::SliderFloat("Camera Speed", &camera.MovementSpeed, 0.0f, 250.0f);
-        ImGui::SliderFloat("Mouse Sensitivity", &camera.MouseSensitivity, 0.0f, 1.0f);
-        ImGui::ColorEdit3("Cube Color", (float *)&cubeColor);
-        // ImGui::SliderFloat3("Cube position", (float *)&cubePos, -20.0f, 20.0f);
-        // // 3 coloredits and 1 slider float
-        // ImGui::ColorEdit3("Ambient Color", (float *)&cubeAmbientColor);
-        // ImGui::ColorEdit3("Diffuse Color", (float *)&cubeDiffuseColor);
-        // ImGui::ColorEdit3("Specular Color", (float *)&cubeSpecularColor);
-        // ImGui::SliderFloat("Shininess", &shininess, 1.0f, 256.0f);
-        ImGui::Text("Light properties:");
-        ImGui::SliderFloat3("Light direction", (float *)&lightDirection, -1.0f, 1.0f);
-        ImGui::SliderFloat("Flashlight Inner cutoff", &flashlightInnerCutoff, 0.0f, 360.0f);
-        ImGui::SliderFloat("Flashlight Outer cutoff", &flashlightOuterCutoff, 0.0f, 360.0f);
-        ImGui::InputFloat("Light constant", &lightConstant);
-        ImGui::InputFloat("Light linear", &lightLinear);
-        ImGui::InputFloat("Light quadratic", &lightQuadratic);
-        ImGui::End();
-
+        // ImGui frame init
+        std::string currentFps = std::to_string(1.0f / deltaTime) + " FPS";
+        // render the cube
+        shader.use();
         // changing over time
         glm::mat4 trans = glm::mat4(1.0f);
         // trans = glm::translate(trans, glm::vec3(0.5f, -0.5f, 0.0f));
         // trans = glm::rotate(trans, (float)glfwGetTime(), glm::vec3(0.0f, 0.0f, 1.0f));
+        glm::mat4 model = glm::mat4(1.0f);
+        glm::mat4 view = camera.GetViewMatrix();
+        glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
+
+        shader.setMat4("model", model);
+        shader.setMat4("view", view);
+        shader.setMat4("projection", projection);
+
+        // cubes
+        glBindVertexArray(cubeVAO);
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, cubeTexture);
+        model = glm::translate(model, glm::vec3(-1.0f, 0.0f, -1.0f));
+        shader.setMat4("model", model);
+        glDrawArrays(GL_TRIANGLES, 0, 36);
         model = glm::mat4(1.0f);
-        model = glm::translate(model, glm::vec3(0.0f, 0.0f, -2.0f));
-        model = glm::rotate(model, glm::radians(static_cast<float>(glfwGetTime()) * rotationSpeed), glm::vec3(0.5f, 1.0f, 0.0f));
-        glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
-        
-        unsigned int transformLoc = glGetUniformLocation(ourShader.ID, "transform");
-        glUniformMatrix4fv(transformLoc, 1, GL_FALSE, glm::value_ptr(trans));
-        
-        /* Rendering the last box */
-        ourModel.Draw(ourShader);
-        // material properties
-        ourShader.setFloat("material.shininess", 32.0f);
-        
-        // view transformation
-        view = camera.GetViewMatrix();
-        glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
-        // projection transformation
-        projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
-        ourShader.setMat4("projection", projection);
-        // lighting
-        ourShader.setVec3("viewPos", camera.Position);
-        // directional light
-        ourShader.setVec3("directionalLight.direction", lightDirection);
-        ourShader.setVec3("directionalLight.ambient", 0.05f, 0.05f, 0.05f);
-        ourShader.setVec3("directionalLight.diffuse", 0.4f, 0.4f, 0.4f);
-        ourShader.setVec3("directionalLight.specular", 0.5f, 0.5f, 0.5f);
-        // point lights loop
-        for (int i = 0; i < 4; i++)
-        {
-            std::string number = std::to_string(i);
-            ourShader.setVec3("pointLight[" + number + "].position", lightPositions[i]);
-            ourShader.setVec3("pointLight[" + number + "].ambient", 0.05f, 0.05f, 0.05f);
-            ourShader.setVec3("pointLight[" + number + "].diffuse", 0.8f, 0.8f, 0.8f);
-            ourShader.setVec3("pointLight[" + number + "].specular", 1.0f, 1.0f, 1.0f);
-            ourShader.setFloat("pointLight[" + number + "].constant", lightConstant);
-            ourShader.setFloat("pointLight[" + number + "].linear", lightLinear);
-            ourShader.setFloat("pointLight[" + number + "].quadratic", lightQuadratic);
-        }
-        // spotlight
-        ourShader.setVec3("spotLight.position", camera.Position);
-        ourShader.setVec3("spotLight.direction", camera.Front);
-        ourShader.setFloat("spotLight.innerCutoff", glm::cos(glm::radians(flashlightInnerCutoff)));
-        ourShader.setFloat("spotLight.outerCutoff", glm::cos(glm::radians(flashlightOuterCutoff)));
-        ourShader.setVec3("spotLight.ambient", 0.0f, 0.0f, 0.0f);
-        ourShader.setVec3("spotLight.diffuse", 1.0f, 1.0f, 1.0f);
-        ourShader.setVec3("spotLight.specular", 1.0f, 1.0f, 1.0f);
-        ourShader.setFloat("spotLight.constant", lightConstant);
-        ourShader.setFloat("spotLight.linear", lightLinear);
-        ourShader.setFloat("spotLight.quadratic", lightQuadratic);
-        
+        model = glm::translate(model, glm::vec3(2.0f, 0.0f, 0.0f));
+        shader.setMat4("model", model);
+        glDrawArrays(GL_TRIANGLES, 0, 36);
+        // floor
+        glBindVertexArray(planeVAO);
+        glBindTexture(GL_TEXTURE_2D, floorTexture);
+        shader.setMat4("model", glm::mat4(1.0f));
+        glDrawArrays(GL_TRIANGLES, 0, 6);
+        glBindVertexArray(0);
+
+        // new frame for imgui
+        imgui_frame_new();
+
+        // ImGui frame update
+        imgui_frame_update();
+
         // Rendering imgui
         // (Your code clears your framebuffer, renders your other stuff etc.)
-        ImGui::Render();
-        ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+        imgui_frame_render();
         // (Your code calls glfwSwapBuffers() etc.)
-        
+
         glfwSwapBuffers(window);
         glfwPollEvents();
     }
 
-    // Cleanup imgui
-    ImGui_ImplOpenGL3_Shutdown();
-    ImGui_ImplGlfw_Shutdown();
-    ImGui::DestroyContext();
+    imgui_frame_shutdown();
 
     glfwTerminate();
     return 0;
@@ -409,4 +409,67 @@ void calculateDeltaTime()
     float currentFrame = static_cast<float>(glfwGetTime());
     deltaTime = currentFrame - lastFrame;
     lastFrame = currentFrame;
+}
+
+void imgui_frame_init(GLFWwindow *window)
+{
+    // Setup Dear ImGui context
+    IMGUI_CHECKVERSION();
+    ImGui::CreateContext();
+    ImGuiIO &io = ImGui::GetIO();
+    io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard; // Enable Keyboard Controls
+    io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;  // Enable Gamepad Controls
+    io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;     // IF using Docking Branch
+    // Setup Platform/Renderer backends
+    ImGui_ImplGlfw_InitForOpenGL(window, true); // Second param install_callback=true will install GLFW callbacks and chain to existing ones.
+    ImGui_ImplOpenGL3_Init();
+}
+
+void imgui_frame_new()
+{
+    // Start the Dear ImGui frame
+    ImGui_ImplOpenGL3_NewFrame();
+    ImGui_ImplGlfw_NewFrame();
+    ImGui::NewFrame();
+}
+
+void imgui_frame_update()
+{
+    ImGui::ShowDemoWindow(); // Show demo window! :)
+    // another
+    ImGui::Begin("Hello, world!"); // Create a window called "Hello, world!" and append into it.
+    // FPS counting
+    ImGui::Text("Calculated: %.3f ms/frame (%.1f FPS)", deltaTime * 1000.0f, 1.0f / deltaTime);
+    ImGui::SliderFloat("Rotation Speed", &rotationSpeed, 0.0f, 360.0f);
+    ImGui::SliderFloat("Camera Speed", &camera.MovementSpeed, 0.0f, 250.0f);
+    ImGui::SliderFloat("Mouse Sensitivity", &camera.MouseSensitivity, 0.0f, 1.0f);
+    // ImGui::ColorEdit3("Cube Color", (float *)&cubeColor);
+    // ImGui::SliderFloat3("Cube position", (float *)&cubePos, -20.0f, 20.0f);
+    // // 3 coloredits and 1 slider float
+    // ImGui::ColorEdit3("Ambient Color", (float *)&cubeAmbientColor);
+    // ImGui::ColorEdit3("Diffuse Color", (float *)&cubeDiffuseColor);
+    // ImGui::ColorEdit3("Specular Color", (float *)&cubeSpecularColor);
+    // ImGui::SliderFloat("Shininess", &shininess, 1.0f, 256.0f);
+    ImGui::Text("Light properties:");
+    ImGui::SliderFloat3("Light direction", (float *)&lightDirection, -1.0f, 1.0f);
+    ImGui::SliderFloat("Flashlight Inner cutoff", &flashlightInnerCutoff, 0.0f, 360.0f);
+    ImGui::SliderFloat("Flashlight Outer cutoff", &flashlightOuterCutoff, 0.0f, 360.0f);
+    ImGui::InputFloat("Light constant", &lightConstant);
+    ImGui::InputFloat("Light linear", &lightLinear);
+    ImGui::InputFloat("Light quadratic", &lightQuadratic);
+    ImGui::End();
+}
+
+void imgui_frame_render()
+{
+    ImGui::Render();
+    ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+}
+
+void imgui_frame_shutdown()
+{
+    // Cleanup imgui
+    ImGui_ImplOpenGL3_Shutdown();
+    ImGui_ImplGlfw_Shutdown();
+    ImGui::DestroyContext();
 }
