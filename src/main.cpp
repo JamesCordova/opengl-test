@@ -171,10 +171,13 @@ int main()
     float rotationSpeed = 50.0f; // degrees per second
 
     // mouse input, set cursor to center of screen
-    glfwSetCursorPos(window, SCR_WIDTH / 2.0, SCR_HEIGHT / 2.0);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glfwSwapBuffers(window);
     glfwShowWindow(window);
+    glfwSetCursorPos(window, SCR_WIDTH / 2.0, SCR_HEIGHT / 2.0);
+
+    // glDepthMask(GL_FALSE);
+    glDepthFunc(GL_LESS); // change depth function so depth test passes when values are equal to depth buffer's content
 
     while (!glfwWindowShouldClose(window))
     {
