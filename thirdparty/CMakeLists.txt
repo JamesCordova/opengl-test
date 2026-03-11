@@ -33,6 +33,16 @@ FetchContent_Declare(
 
 FetchContent_MakeAvailable(imgui)
 
+FetchContent_Declare(
+    assimp
+    GIT_REPOSITORY  https://github.com/assimp/assimp.git
+    GIT_TAG         e0b52347c6e52de2827ec957a9ebf00ce3c54f79 #refs/tags/v6.0.4
+    GIT_SHALLOW     TRUE
+    SOURCE_DIR      ${CMAKE_CURRENT_SOURCE_DIR}/assimp
+)
+
+FetchContent_MakeAvailable(assimp)
+
 add_subdirectory(imgui-cmake) # Needs building
 
 add_subdirectory(glad)
