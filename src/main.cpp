@@ -124,7 +124,7 @@ int main()
     imgui_frame_init(window);
 
     // Implementation
-    Shader normalShader("assets/shaders/depthTesting.vert", "assets/shaders/depthTesting.frag");
+    Shader normalShader("assets/shaders/blending.vert", "assets/shaders/blending.frag");
     Shader singleColorShader("assets/shaders/simpleOutline.vert", "assets/shaders/simpleOutline.frag");
 
     float cubeVertices[] = {
@@ -181,6 +181,23 @@ int main()
         -5.0f, -0.5f, -5.0f, 0.0f, 2.0f,
         5.0f, -0.5f, -5.0f, 2.0f, 2.0f};
 
+    float transparentVertices[] = {
+        // positions         // texture Coords (swapped y coordinates because texture is flipped upside down)
+        0.0f, 0.5f, 0.0f, 0.0f, 0.0f,
+        0.0f, -0.5f, 0.0f, 0.0f, 1.0f,
+        1.0f, -0.5f, 0.0f, 1.0f, 1.0f,
+
+        0.0f, 0.5f, 0.0f, 0.0f, 0.0f,
+        1.0f, -0.5f, 0.0f, 1.0f, 1.0f,
+        1.0f, 0.5f, 0.0f, 1.0f, 0.0f};
+
+    std::vector<glm::vec3> vegetation;
+    vegetation.push_back(glm::vec3(-1.5f, 0.0f, -0.48f));
+    vegetation.push_back(glm::vec3(1.5f, 0.0f, 0.51f));
+    vegetation.push_back(glm::vec3(0.0f, 0.0f, 0.7f));
+    vegetation.push_back(glm::vec3(-0.3f, 0.0f, -2.3f));
+    vegetation.push_back(glm::vec3(0.5f, 0.0f, -0.6f));
+
     // cubeVAO
     unsigned int cubeVAO, cubeVBO;
     glGenVertexArrays(1, &cubeVAO);
@@ -205,11 +222,24 @@ int main()
     glEnableVertexAttribArray(1);
     glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void *)(3 * sizeof(float)));
     glBindVertexArray(0);
+    // vegetation VAO
+    unsigned int vegetationVAO, vegetationVBO;
+    glGenVertexArrays(1, &vegetationVAO);
+    glGenBuffers(1, &vegetationVBO);
+    glBindVertexArray(vegetationVAO);
+    glBindBuffer(GL_ARRAY_BUFFER, vegetationVBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(transparentVertices), &transparentVertices, GL_STATIC_DRAW);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void *)0);
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void *)(3 * sizeof(float)));
+    glBindVertexArray(0);
 
     // Load Textures
-    stbi_set_flip_vertically_on_load(true);
+    // stbi_set_flip_vertically_on_load(true);
     unsigned int cubeTexture = loadTexture("assets/textures/marble.jpg");
     unsigned int floorTexture = loadTexture("assets/textures/metal.png");
+    unsigned int vegetationTexture = loadTexture("assets/textures/grass.png");
 
     // Shader configuration
     normalShader.use();
@@ -239,7 +269,6 @@ int main()
         glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
 
-
         // changing over time
         glm::mat4 trans = glm::mat4(1.0f);
         // trans = glm::translate(trans, glm::vec3(0.5f, -0.5f, 0.0f));
@@ -260,7 +289,7 @@ int main()
         normalShader.setMat4("model", glm::mat4(1.0f));
         glDrawArrays(GL_TRIANGLES, 0, 6);
         glBindVertexArray(0);
-        
+
         // cubes
         glStencilFunc(GL_ALWAYS, 1, 0xFF); // all fragments should pass the stencil test
         glStencilMask(0xFF);               // enable writing to the stencil buffer
@@ -277,8 +306,8 @@ int main()
 
         // outline
         glStencilFunc(GL_NOTEQUAL, 1, 0xFF);
-        glStencilMask(0x00); // disable writing to the stencil buffer
-        glDisable(GL_DEPTH_TEST); // through other objects 
+        glStencilMask(0x00);      // disable writing to the stencil buffer
+        glDisable(GL_DEPTH_TEST); // through other objects
         float scale = 1.05f;
 
         singleColorShader.use();
@@ -296,9 +325,21 @@ int main()
         glDrawArrays(GL_TRIANGLES, 0, 36);
 
         // if we dont put this line glclear dont work
-        glStencilMask(0xFF); // enable writing to the stencil buffer without this outline will disappear when the cubes are drawn again in the next frame
+        glStencilMask(0xFF);               // enable writing to the stencil buffer without this outline will disappear when the cubes are drawn again in the next frame
         glStencilFunc(GL_ALWAYS, 1, 0xFF); // again to default, just for safety // erase it dont afefct because plane dont write the buffer
         glEnable(GL_DEPTH_TEST);
+
+        normalShader.use();
+        glBindVertexArray(vegetationVAO);
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, vegetationTexture);
+        for (unsigned int i = 0; i < vegetation.size(); i++)
+        {
+            model = glm::mat4(1.0f);
+            model = glm::translate(model, vegetation[i]);
+            normalShader.setMat4("model", model);
+            glDrawArrays(GL_TRIANGLES, 0, 6);
+        }
 
         // new frame for imgui
         imgui_frame_new();
@@ -383,21 +424,36 @@ unsigned int loadTexture(const char *path)
     unsigned char *data = stbi_load(path, &width, &height, &nrComponents, 0);
     if (data)
     {
-        GLenum format;
-        if (nrComponents == 1)
-            format = GL_RED;
-        else if (nrComponents == 3)
-            format = GL_RGB;
-        else if (nrComponents == 4)
-            format = GL_RGBA;
-        else
-            format = GL_RGB; // default to RGB if unknown
-
         glBindTexture(GL_TEXTURE_2D, textureID);
 
-        // wrapping and filtering options
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+        GLenum format;
+        if (nrComponents == 1)
+        {
+            format = GL_RED;
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+        }
+        else if (nrComponents == 3)
+        {
+            format = GL_RGB;
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+        }
+        else if (nrComponents == 4)
+        {
+            format = GL_RGBA;
+            // wrapping for transparent textures
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        }
+        else
+        {
+            format = GL_RGB; // default to RGB if unknown
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+        }
+
+        // filtering options
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
         // load texture data
