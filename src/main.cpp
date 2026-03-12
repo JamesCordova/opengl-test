@@ -116,6 +116,7 @@ int main()
 
     // Configure global opengl state
     glEnable(GL_DEPTH_TEST);
+    glEnable(GL_STENCIL_TEST);
     // Test output
     std::cout << "Hello, OpenGL!" << std::endl;
 
@@ -123,7 +124,8 @@ int main()
     imgui_frame_init(window);
 
     // Implementation
-    Shader shader("assets/shaders/depthTesting.vert", "assets/shaders/depthTesting.frag");
+    Shader normalShader("assets/shaders/depthTesting.vert", "assets/shaders/depthTesting.frag");
+    Shader singleColorShader("assets/shaders/simpleOutline.vert", "assets/shaders/simpleOutline.frag");
 
     float cubeVertices[] = {
         // positions          // texture Coords
@@ -210,16 +212,15 @@ int main()
     unsigned int floorTexture = loadTexture("assets/textures/metal.png");
 
     // Shader configuration
-    shader.use();
-    shader.setInt("texture1", 0);
+    normalShader.use();
+    normalShader.setInt("texture1", 0);
 
     // finish
     // set the model, view, and projection matrices in the shader
 
-
     // mouse input, set cursor to center of screen
     glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
     glfwSwapBuffers(window);
     glfwShowWindow(window);
     glfwSetCursorPos(window, SCR_WIDTH / 2.0, SCR_HEIGHT / 2.0);
@@ -231,13 +232,14 @@ int main()
     {
         processInput(window);
         calculateDeltaTime();
-        // Rendering
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-        // ImGui frame init
+        // FPS counter
         std::string currentFps = std::to_string(1.0f / deltaTime) + " FPS";
-        // render the cube
-        shader.use();
+
+        // Rendering
+        glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
+
+
         // changing over time
         glm::mat4 trans = glm::mat4(1.0f);
         // trans = glm::translate(trans, glm::vec3(0.5f, -0.5f, 0.0f));
@@ -246,27 +248,57 @@ int main()
         glm::mat4 view = camera.GetViewMatrix();
         glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
 
-        shader.setMat4("model", model);
-        shader.setMat4("view", view);
-        shader.setMat4("projection", projection);
+        normalShader.use();
+        normalShader.setMat4("model", model);
+        normalShader.setMat4("view", view);
+        normalShader.setMat4("projection", projection);
 
+        // floor
+        glStencilMask(0x00); // disable writing to the stencil buffer
+        glBindVertexArray(planeVAO);
+        glBindTexture(GL_TEXTURE_2D, floorTexture);
+        normalShader.setMat4("model", glm::mat4(1.0f));
+        glDrawArrays(GL_TRIANGLES, 0, 6);
+        glBindVertexArray(0);
+        
         // cubes
+        glStencilFunc(GL_ALWAYS, 1, 0xFF); // all fragments should pass the stencil test
+        glStencilMask(0xFF);               // enable writing to the stencil buffer
         glBindVertexArray(cubeVAO);
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, cubeTexture);
         model = glm::translate(model, glm::vec3(-1.0f, 0.0f, -1.0f));
-        shader.setMat4("model", model);
+        normalShader.setMat4("model", model);
         glDrawArrays(GL_TRIANGLES, 0, 36);
         model = glm::mat4(1.0f);
         model = glm::translate(model, glm::vec3(2.0f, 0.0f, 0.0f));
-        shader.setMat4("model", model);
+        normalShader.setMat4("model", model);
         glDrawArrays(GL_TRIANGLES, 0, 36);
-        // floor
-        glBindVertexArray(planeVAO);
-        glBindTexture(GL_TEXTURE_2D, floorTexture);
-        shader.setMat4("model", glm::mat4(1.0f));
-        glDrawArrays(GL_TRIANGLES, 0, 6);
-        glBindVertexArray(0);
+
+        // outline
+        glStencilFunc(GL_NOTEQUAL, 1, 0xFF);
+        glStencilMask(0x00); // disable writing to the stencil buffer
+        glDisable(GL_DEPTH_TEST); // through other objects 
+        float scale = 1.05f;
+
+        singleColorShader.use();
+        singleColorShader.setMat4("view", view);
+        singleColorShader.setMat4("projection", projection);
+        model = glm::scale(model, glm::vec3(scale, scale, scale));
+        singleColorShader.setMat4("model", model);
+        glBindVertexArray(cubeVAO);
+        glDrawArrays(GL_TRIANGLES, 0, 36);
+        // another
+        model = glm::mat4(1.0f);
+        model = glm::translate(model, glm::vec3(-1.0f, 0.0f, -1.0f));
+        model = glm::scale(model, glm::vec3(scale, scale, scale));
+        singleColorShader.setMat4("model", model);
+        glDrawArrays(GL_TRIANGLES, 0, 36);
+
+        // if we dont put this line glclear dont work
+        glStencilMask(0xFF); // enable writing to the stencil buffer without this outline will disappear when the cubes are drawn again in the next frame
+        glStencilFunc(GL_ALWAYS, 1, 0xFF); // again to default, just for safety // erase it dont afefct because plane dont write the buffer
+        glEnable(GL_DEPTH_TEST);
 
         // new frame for imgui
         imgui_frame_new();
