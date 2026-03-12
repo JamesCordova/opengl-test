@@ -22,6 +22,7 @@
 
 // standard library
 #include <iostream>
+#include <map>
 
 namespace FileSystem
 {
@@ -124,7 +125,7 @@ int main()
     imgui_frame_init(window);
 
     // Implementation
-    Shader normalShader("assets/shaders/blending.vert", "assets/shaders/blending.frag");
+    Shader normalShader("assets/shaders/blendingFunc.vert", "assets/shaders/blendingFunc.frag");
     Shader singleColorShader("assets/shaders/simpleOutline.vert", "assets/shaders/simpleOutline.frag");
 
     float cubeVertices[] = {
@@ -239,7 +240,8 @@ int main()
     // stbi_set_flip_vertically_on_load(true);
     unsigned int cubeTexture = loadTexture("assets/textures/marble.jpg");
     unsigned int floorTexture = loadTexture("assets/textures/metal.png");
-    unsigned int vegetationTexture = loadTexture("assets/textures/grass.png");
+    // unsigned int vegetationTexture = loadTexture("assets/textures/grass.png");
+    unsigned int transparentTexture = loadTexture("assets/textures/blending_transparent_window.png");
 
     // Shader configuration
     normalShader.use();
@@ -257,6 +259,8 @@ int main()
 
     // glDepthMask(GL_FALSE);
     glDepthFunc(GL_LESS); // change depth function so depth test passes when values are equal to depth buffer's content
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
     while (!glfwWindowShouldClose(window))
     {
@@ -332,11 +336,19 @@ int main()
         normalShader.use();
         glBindVertexArray(vegetationVAO);
         glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, vegetationTexture);
+        glBindTexture(GL_TEXTURE_2D, transparentTexture);
+        // sort
+        std::map<float, glm::vec3> sorted;
         for (unsigned int i = 0; i < vegetation.size(); i++)
         {
+            float distance = glm::length(camera.Position - vegetation[i]);
+            sorted[distance] = vegetation[i];
+        }
+        // render
+        for (auto it = sorted.rbegin(); it != sorted.rend(); ++it)
+        {
             model = glm::mat4(1.0f);
-            model = glm::translate(model, vegetation[i]);
+            model = glm::translate(model, it->second);
             normalShader.setMat4("model", model);
             glDrawArrays(GL_TRIANGLES, 0, 6);
         }
