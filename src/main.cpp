@@ -127,7 +127,7 @@ int main()
     // Implementation
     Shader normalShader("assets/shaders/blendingFunc.vert", "assets/shaders/blendingFunc.frag");
     Shader singleColorShader("assets/shaders/simpleOutline.vert", "assets/shaders/simpleOutline.frag");
-    Shader screenShader("assets/shaders/framebuffersSimpleQuad.vert", "assets/shaders/framebuffersSimpleQuad.frag");
+    Shader screenShader("assets/shaders/framebuffersPostprocessingNegative.vert", "assets/shaders/framebuffersPostprocessingNegative.frag");
 
     float cubeVertices[] = {
         // positions          // texture Coords
