@@ -34,6 +34,7 @@ namespace FileSystem
 
 void framebuffer_size_callback(GLFWwindow *window, int width, int height);
 void DrawScene(Shader &normalShader, unsigned int planeVAO, unsigned int floorTexture, unsigned int cubeVAO, unsigned int cubeTexture, Shader &singleColorShader, unsigned int vegetationVAO, unsigned int transparentTexture, std::vector<glm::vec3> &vegetation);
+void DrawReflectiveCube(Shader &reflectiveContainerShader, unsigned int containerReflectVAO, unsigned int cubemapTexture);
 void DrawSkybox(Shader &skyboxShader, unsigned int skyboxVAO, unsigned int cubemapTexture);
 void mouse_callback(GLFWwindow *window, double xpos, double ypos);
 void scroll_callback(GLFWwindow *window, double xoffset, double yoffset);
@@ -132,6 +133,7 @@ int main()
     Shader singleColorShader("assets/shaders/simpleOutline.vert", "assets/shaders/simpleOutline.frag");
     Shader screenShader("assets/shaders/framebuffersBearMirror.vert", "assets/shaders/framebuffersBearMirror.frag");
     Shader skyboxShader("assets/shaders/cubemaps.vert", "assets/shaders/cubemaps.frag");
+    Shader reflectiveContainerShader("assets/shaders/cubemapsContainerReflect.vert", "assets/shaders/cubemapsContainerReflect.frag");
 
     float cubeVertices[] = {
         // positions          // texture Coords
@@ -176,6 +178,51 @@ int main()
         -0.5f, 0.5f, 0.5f, 0.0f, 0.0f,
         0.5f, 0.5f, 0.5f, 1.0f, 0.0f,
         -0.5f, 0.5f, -0.5f, 0.0f, 1.0f // top face
+    };
+
+    float containerReflectiveVertices[] = {
+        // positions         // normals
+        -0.5f, -0.5f, -0.5f, 0.0f, 0.0f, -1.0f,
+        0.5f, 0.5f, -0.5f, 0.0f, 0.0f, -1.0f,
+        0.5f, -0.5f, -0.5f, 0.0f, 0.0f, -1.0f,
+        -0.5f, 0.5f, -0.5f, 0.0f, 0.0f, -1.0f,
+        0.5f, 0.5f, -0.5f, 0.0f, 0.0f, -1.0f,
+        -0.5f, -0.5f, -0.5f, 0.0f, 0.0f, -1.0f, // back face
+
+        -0.5f, -0.5f, 0.5f, 0.0f, 0.0f, 1.0f,
+        0.5f, -0.5f, 0.5f, 0.0f, 0.0f, 1.0f,
+        0.5f, 0.5f, 0.5f, 0.0f, 0.0f, 1.0f,
+        0.5f, 0.5f, 0.5f, 0.0f, 0.0f, 1.0f,
+        -0.5f, 0.5f, 0.5f, 0.0f, 0.0f, 1.0f,
+        -0.5f, -0.5f, 0.5f, 0.0f, 0.0f, 1.0f, // front face
+
+        -0.5f, 0.5f, 0.5f, -1.0f, 0.0f, 0.0f,
+        -0.5f, 0.5f, -0.5f, -1.0f, 0.0f, 0.0f,
+        -0.5f, -0.5f, -0.5f, -1.0f, 0.0f, 0.0f,
+        -0.5f, -0.5f, -0.5f, -1.0f, 0.0f, 0.0f,
+        -0.5f, -0.5f, 0.5f, -1.0f, 0.0f, 0.0f,
+        -0.5f, 0.5f, 0.5f, -1.0f, 0.0f, 0.0f, // left face
+
+        0.5f, 0.5f, 0.5f, 1.0f, 0.0f, 0.0f,
+        0.5f, -0.5f, -0.5f, 1.0f, 0.0f, 0.0f,
+        0.5f, 0.5f, -0.5f, 1.0f, 0.0f, 0.0f,
+        0.5f, -0.5f, 0.5f, 1.0f, 0.0f, 0.0f,
+        0.5f, -0.5f, -0.5f, 1.0f, 0.0f, 0.0f,
+        0.5f, 0.5f, 0.5f, 1.0f, 0.0f, 0.0f, // right face
+
+        -0.5f, -0.5f, -0.5f, 0.0f, -1.0f, 0.0f,
+        0.5f, -0.5f, -0.5f, 0.0f, -1.0f, 0.0f,
+        0.5f, -0.5f, 0.5f, 0.0f, -1.0f, 0.0f,
+        0.5f, -0.5f, 0.5f, 0.0f, -1.0f, 0.0f,
+        -0.5f, -0.5f, 0.5f, 0.0f, -1.0f, 0.0f,
+        -0.5f, -0.5f, -0.5f, 0.0f, -1.0f, 0.0f, // bottom face
+
+        -0.5f, 0.5f, -0.5f, 0.0f, 1.0f, 0.0f,
+        0.5f, 0.5f, 0.5f, 0.0f, 1.0f, 0.0f,
+        0.5f, 0.5f, -0.5f, 0.0f, 1.0f, 0.0f,
+        -0.5f, 0.5f, 0.5f, 0.0f, 1.0f, 0.0f,
+        0.5f, 0.5f, 0.5f, 0.0f, 1.0f, 0.0f,
+        -0.5f, 0.5f, -0.5f, 0.0f, 1.0f, 0.0f // top face
     };
 
     float planeVertices[] = {
@@ -325,6 +372,18 @@ int main()
     glEnableVertexAttribArray(0);
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void *)0);
     glBindVertexArray(0);
+    // Reflective container VAO
+    unsigned int containerReflectVAO, containerReflectVBO;
+    glGenVertexArrays(1, &containerReflectVAO);
+    glGenBuffers(1, &containerReflectVBO);
+    glBindVertexArray(containerReflectVAO);
+    glBindBuffer(GL_ARRAY_BUFFER, containerReflectVBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(containerReflectiveVertices), &containerReflectiveVertices, GL_STATIC_DRAW);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void *)0);
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void *)(3 * sizeof(float)));
+    glBindVertexArray(0);
 
     // Load Textures
     // stbi_set_flip_vertically_on_load(true);
@@ -410,17 +469,19 @@ int main()
         glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
 
-        DrawSkybox(skyboxShader, skyboxVAO, cubemapTexture);
-
         DrawScene(normalShader, planeVAO, floorTexture, cubeVAO, cubeTexture, singleColorShader, vegetationVAO, transparentTexture, vegetation);
+        // Drawing skybox after objets is more efficient
+        DrawSkybox(skyboxShader, skyboxVAO, cubemapTexture);
 
         // Now the window's framebuffer default
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
         glClearColor(0.2f, 0.3f, 0.5f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        DrawSkybox(skyboxShader, skyboxVAO, cubemapTexture);
         DrawScene(normalShader, planeVAO, floorTexture, cubeVAO, cubeTexture, singleColorShader, vegetationVAO, transparentTexture, vegetation);
+        DrawReflectiveCube(reflectiveContainerShader, containerReflectVAO, cubemapTexture);
+        // Drawing skybox after objets is more efficient
+        DrawSkybox(skyboxShader, skyboxVAO, cubemapTexture);
         screenShader.use();
         glBindVertexArray(quadVAO);
         glm::mat4 model = glm::mat4(1.0f);
@@ -456,11 +517,29 @@ int main()
     return 0;
 }
 
+void DrawReflectiveCube(Shader &reflectiveContainerShader, unsigned int containerReflectVAO, unsigned int cubemapTexture)
+{
+    // Drawing reflective container
+    reflectiveContainerShader.use();
+    glm::mat4 model = glm::mat4(1.0f);
+    model = glm::translate(model, glm::vec3(0.0f, 0.5f, 0.0f));
+    // model = glm::rotate(model, glm::radians((float)glfwGetTime() * 20.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+    glm::mat4 view = camera.GetViewMatrix();
+    glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
+    reflectiveContainerShader.setMat4("model", model);
+    reflectiveContainerShader.setMat4("view", view);
+    reflectiveContainerShader.setMat4("projection", projection);
+    reflectiveContainerShader.setVec3("cameraPos", camera.Position);
+    glBindVertexArray(containerReflectVAO);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, cubemapTexture);
+    glDrawArrays(GL_TRIANGLES, 0, 36);
+}
 void DrawSkybox(Shader &skyboxShader, unsigned int skyboxVAO, unsigned int cubemapTexture)
 {
     static bool mirrorPass = true;
     // skybox
-    // the skybox/cube is near camera, so always pass depth test and write it to depth buffer, 
+    // the skybox/cube is near camera, so always pass depth test and write it to depth buffer,
     // other objects far away will fail so we deactivate depth writing, after finish skyboz drawing we set depth function back to default to render other objects, this way we can avoid the problem of skybox always being in the back of the scene
     // we draw the other objects that will pass based on proper depht buffer
     // glDepthMask(GL_FALSE); // this is not the most efficient approach
@@ -476,7 +555,7 @@ void DrawSkybox(Shader &skyboxShader, unsigned int skyboxVAO, unsigned int cubem
         staticView = camera.GetViewMatrix();
         // return the camera to original orientation for normal rendering
         camera.Yaw -= 180.0f;
-        camera.ProcessMouseMovement(0, 0, true); // need de-privatize the method
+        camera.ProcessMouseMovement(0, 0, true);       // need de-privatize the method
         staticView = glm::mat4(glm::mat3(staticView)); // remove translation from the view matrix
         mirrorPass = false;
     }
