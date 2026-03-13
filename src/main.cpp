@@ -393,6 +393,7 @@ int main()
     unsigned int transparentTexture = loadTexture("assets/textures/blending_transparent_window.png");
     // unsigned int containerTexture = loadTexture("assets/textures/container.jpg");
     unsigned int cubemapTexture = loadCubemap(faces);
+    Model backpack = Model("assets/objects/backpack/backpack.obj");
 
     // framebuffers
     unsigned int framebuffer;
@@ -480,6 +481,7 @@ int main()
 
         DrawScene(normalShader, planeVAO, floorTexture, cubeVAO, cubeTexture, singleColorShader, vegetationVAO, transparentTexture, vegetation);
         DrawReflectiveCube(reflectiveContainerShader, containerReflectVAO, cubemapTexture);
+        backpack.Draw(reflectiveContainerShader);
         // Drawing skybox after objets is more efficient
         DrawSkybox(skyboxShader, skyboxVAO, cubemapTexture);
         screenShader.use();
@@ -517,12 +519,12 @@ int main()
     return 0;
 }
 
-void DrawReflectiveCube(Shader &reflectiveContainerShader, unsigned int containerReflectVAO, unsigned int cubemapTexture)
+void DrawReflectiveCube(Shader &reflectiveContainerShader, [[maybe_unused]] unsigned int containerReflectVAO, [[maybe_unused]] unsigned int cubemapTexture)
 {
     // Drawing reflective container
     reflectiveContainerShader.use();
     glm::mat4 model = glm::mat4(1.0f);
-    model = glm::translate(model, glm::vec3(0.0f, 0.5f, 0.0f));
+    model = glm::translate(model, glm::vec3(0.0f, 1.5f, 0.0f));
     // model = glm::rotate(model, glm::radians((float)glfwGetTime() * 20.0f), glm::vec3(0.0f, 1.0f, 0.0f));
     glm::mat4 view = camera.GetViewMatrix();
     glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
@@ -534,6 +536,9 @@ void DrawReflectiveCube(Shader &reflectiveContainerShader, unsigned int containe
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_CUBE_MAP, cubemapTexture);
     glDrawArrays(GL_TRIANGLES, 0, 36);
+    model = glm::translate(model, glm::vec3(0.0f, 3.5f, 0.0f));
+    reflectiveContainerShader.setMat4("model", model);
+
 }
 void DrawSkybox(Shader &skyboxShader, unsigned int skyboxVAO, unsigned int cubemapTexture)
 {
@@ -597,6 +602,11 @@ void DrawScene(Shader &normalShader, unsigned int planeVAO, unsigned int floorTe
         // view = camera.GetViewMatrix();
         // camera.Yaw -= 180.0f;
         // // camera.updateCameraVectors(); // the same as above
+        glm::vec3 position = glm::vec3(2.5f, 0.5f, -1.5f);
+        glm::vec3 normal = glm::vec3(-1.0f, 0.0f, 0.0f);
+        position = position - (glm::reflect(position - camera.Position, normal));
+        view = glm::lookAt(position, position + glm::reflect(camera.Front, normal), glm::reflect(camera.Up, normal));
+        // glm::mat4 view = glm::lookAt(camera.Position, (-camera.Front) - camera.Position, camera.Up);
         mirrorPass = false;
     }
     else
