@@ -33,6 +33,7 @@ namespace FileSystem
 }
 
 void framebuffer_size_callback(GLFWwindow *window, int width, int height);
+void DrawScene(Shader &normalShader, unsigned int planeVAO, unsigned int floorTexture, unsigned int cubeVAO, unsigned int cubeTexture, Shader &singleColorShader, unsigned int vegetationVAO, unsigned int transparentTexture, std::vector<glm::vec3> &vegetation);
 void mouse_callback(GLFWwindow *window, double xpos, double ypos);
 void scroll_callback(GLFWwindow *window, double xoffset, double yoffset);
 void processInput(GLFWwindow *window);
@@ -127,7 +128,7 @@ int main()
     // Implementation
     Shader normalShader("assets/shaders/blendingFunc.vert", "assets/shaders/blendingFunc.frag");
     Shader singleColorShader("assets/shaders/simpleOutline.vert", "assets/shaders/simpleOutline.frag");
-    Shader screenShader("assets/shaders/framebuffersPostprocessingKernelEdgeDetection.vert", "assets/shaders/framebuffersPostprocessingKernelEdgeDetection.frag");
+    Shader screenShader("assets/shaders/framebuffersBearMirror.vert", "assets/shaders/framebuffersBearMirror.frag");
 
     float cubeVertices[] = {
         // positions          // texture Coords
@@ -343,94 +344,24 @@ int main()
         glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
 
-        // changing over time
-        glm::mat4 trans = glm::mat4(1.0f);
-        // trans = glm::translate(trans, glm::vec3(0.5f, -0.5f, 0.0f));
-        // trans = glm::rotate(trans, (float)glfwGetTime(), glm::vec3(0.0f, 0.0f, 1.0f));
-        glm::mat4 model = glm::mat4(1.0f);
-        glm::mat4 view = camera.GetViewMatrix();
-        glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
-
-        normalShader.use();
-        normalShader.setMat4("model", model);
-        normalShader.setMat4("view", view);
-        normalShader.setMat4("projection", projection);
-
-        // floor
-        glStencilMask(0x00); // disable writing to the stencil buffer
-        glBindVertexArray(planeVAO);
-        glBindTexture(GL_TEXTURE_2D, floorTexture);
-        normalShader.setMat4("model", glm::mat4(1.0f));
-        glDrawArrays(GL_TRIANGLES, 0, 6);
-        glBindVertexArray(0);
-
-        // cubes
-        glStencilFunc(GL_ALWAYS, 1, 0xFF); // all fragments should pass the stencil test
-        glStencilMask(0xFF);               // enable writing to the stencil buffer
-        glBindVertexArray(cubeVAO);
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, cubeTexture);
-        model = glm::translate(model, glm::vec3(-1.0f, 0.0f, -1.0f));
-        normalShader.setMat4("model", model);
-        glDrawArrays(GL_TRIANGLES, 0, 36);
-        model = glm::mat4(1.0f);
-        model = glm::translate(model, glm::vec3(2.0f, 0.0f, 0.0f));
-        normalShader.setMat4("model", model);
-        glDrawArrays(GL_TRIANGLES, 0, 36);
-
-        // outline
-        glStencilFunc(GL_NOTEQUAL, 1, 0xFF);
-        glStencilMask(0x00);      // disable writing to the stencil buffer
-        glDisable(GL_DEPTH_TEST); // through other objects
-        float scale = 1.05f;
-
-        singleColorShader.use();
-        singleColorShader.setMat4("view", view);
-        singleColorShader.setMat4("projection", projection);
-        model = glm::scale(model, glm::vec3(scale, scale, scale));
-        singleColorShader.setMat4("model", model);
-        glBindVertexArray(cubeVAO);
-        glDrawArrays(GL_TRIANGLES, 0, 36);
-        // another
-        model = glm::mat4(1.0f);
-        model = glm::translate(model, glm::vec3(-1.0f, 0.0f, -1.0f));
-        model = glm::scale(model, glm::vec3(scale, scale, scale));
-        singleColorShader.setMat4("model", model);
-        glDrawArrays(GL_TRIANGLES, 0, 36);
-
-        // if we dont put this line glclear dont work
-        glStencilMask(0xFF);               // enable writing to the stencil buffer without this outline will disappear when the cubes are drawn again in the next frame
-        glStencilFunc(GL_ALWAYS, 1, 0xFF); // again to default, just for safety // erase it dont afefct because plane dont write the buffer
-        glEnable(GL_DEPTH_TEST);
-
-        normalShader.use();
-        glBindVertexArray(vegetationVAO);
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, transparentTexture);
-        // sort
-        std::map<float, glm::vec3> sorted;
-        for (unsigned int i = 0; i < vegetation.size(); i++)
-        {
-            float distance = glm::length(camera.Position - vegetation[i]);
-            sorted[distance] = vegetation[i];
-        }
-        // render
-        for (auto it = sorted.rbegin(); it != sorted.rend(); ++it)
-        {
-            model = glm::mat4(1.0f);
-            model = glm::translate(model, it->second);
-            normalShader.setMat4("model", model);
-            glDrawArrays(GL_TRIANGLES, 0, 6);
-        }
+        DrawScene(normalShader, planeVAO, floorTexture, cubeVAO, cubeTexture, singleColorShader, vegetationVAO, transparentTexture, vegetation);
 
         // Now the window's framebuffer default
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
         glClearColor(0.2f, 0.3f, 0.5f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
+        DrawScene(normalShader, planeVAO, floorTexture, cubeVAO, cubeTexture, singleColorShader, vegetationVAO, transparentTexture, vegetation);
         screenShader.use();
         glBindVertexArray(quadVAO);
-        // glDisable(GL_DEPTH_TEST);
+        glm::mat4 model = glm::mat4(1.0f);
+        model = glm::translate(model, glm::vec3(0.0f, 0.0f, -2.0f));
+        // glm::mat4 view = glm::lookAt(camera.Position, (-camera.Front) - camera.Position, camera.Up);
+        glm::mat4 view = camera.GetViewMatrix();
+        glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
+        screenShader.setMat4("model", model);
+        screenShader.setMat4("view", view);
+        screenShader.setMat4("projection", projection);
         glBindTexture(GL_TEXTURE_2D, textureColorBuffer);
         glDrawArrays(GL_TRIANGLES, 0, 6);
 
@@ -453,6 +384,89 @@ int main()
 
     glfwTerminate();
     return 0;
+}
+
+void DrawScene(Shader &normalShader, unsigned int planeVAO, unsigned int floorTexture, unsigned int cubeVAO, unsigned int cubeTexture, Shader &singleColorShader, unsigned int vegetationVAO, unsigned int transparentTexture, std::vector<glm::vec3> &vegetation)
+{
+    // changing over time
+    glm::mat4 trans = glm::mat4(1.0f);
+    // trans = glm::translate(trans, glm::vec3(0.5f, -0.5f, 0.0f));
+    // trans = glm::rotate(trans, (float)glfwGetTime(), glm::vec3(0.0f, 0.0f, 1.0f));
+    glm::mat4 model = glm::mat4(1.0f);
+    glm::mat4 view = camera.GetViewMatrix();
+    glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
+
+    normalShader.use();
+    normalShader.setMat4("model", model);
+    normalShader.setMat4("view", view);
+    normalShader.setMat4("projection", projection);
+
+    // floor
+    glStencilMask(0x00); // disable writing to the stencil buffer
+    glBindVertexArray(planeVAO);
+    glBindTexture(GL_TEXTURE_2D, floorTexture);
+    normalShader.setMat4("model", glm::mat4(1.0f));
+    glDrawArrays(GL_TRIANGLES, 0, 6);
+    glBindVertexArray(0);
+
+    // cubes
+    glStencilFunc(GL_ALWAYS, 1, 0xFF); // all fragments should pass the stencil test
+    glStencilMask(0xFF);               // enable writing to the stencil buffer
+    glBindVertexArray(cubeVAO);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, cubeTexture);
+    model = glm::translate(model, glm::vec3(-1.0f, 0.0f, -1.0f));
+    normalShader.setMat4("model", model);
+    glDrawArrays(GL_TRIANGLES, 0, 36);
+    model = glm::mat4(1.0f);
+    model = glm::translate(model, glm::vec3(2.0f, 0.0f, 0.0f));
+    normalShader.setMat4("model", model);
+    glDrawArrays(GL_TRIANGLES, 0, 36);
+
+    // outline
+    glStencilFunc(GL_NOTEQUAL, 1, 0xFF);
+    glStencilMask(0x00);      // disable writing to the stencil buffer
+    glDisable(GL_DEPTH_TEST); // through other objects
+    float scale = 1.05f;
+
+    singleColorShader.use();
+    singleColorShader.setMat4("view", view);
+    singleColorShader.setMat4("projection", projection);
+    model = glm::scale(model, glm::vec3(scale, scale, scale));
+    singleColorShader.setMat4("model", model);
+    glBindVertexArray(cubeVAO);
+    glDrawArrays(GL_TRIANGLES, 0, 36);
+    // another
+    model = glm::mat4(1.0f);
+    model = glm::translate(model, glm::vec3(-1.0f, 0.0f, -1.0f));
+    model = glm::scale(model, glm::vec3(scale, scale, scale));
+    singleColorShader.setMat4("model", model);
+    glDrawArrays(GL_TRIANGLES, 0, 36);
+
+    // if we dont put this line glclear dont work
+    glStencilMask(0xFF);               // enable writing to the stencil buffer without this outline will disappear when the cubes are drawn again in the next frame
+    glStencilFunc(GL_ALWAYS, 1, 0xFF); // again to default, just for safety // erase it dont afefct because plane dont write the buffer
+    glEnable(GL_DEPTH_TEST);
+
+    normalShader.use();
+    glBindVertexArray(vegetationVAO);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, transparentTexture);
+    // sort
+    std::map<float, glm::vec3> sorted;
+    for (unsigned int i = 0; i < vegetation.size(); i++)
+    {
+        float distance = glm::length(camera.Position - vegetation[i]);
+        sorted[distance] = vegetation[i];
+    }
+    // render
+    for (auto it = sorted.rbegin(); it != sorted.rend(); ++it)
+    {
+        model = glm::mat4(1.0f);
+        model = glm::translate(model, it->second);
+        normalShader.setMat4("model", model);
+        glDrawArrays(GL_TRIANGLES, 0, 6);
+    }
 }
 
 void framebuffer_size_callback([[maybe_unused]] GLFWwindow *window, int width, int height)
