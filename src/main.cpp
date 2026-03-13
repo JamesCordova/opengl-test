@@ -35,6 +35,7 @@ namespace FileSystem
 void framebuffer_size_callback(GLFWwindow *window, int width, int height);
 void DrawScene(Shader &normalShader, unsigned int planeVAO, unsigned int floorTexture, unsigned int cubeVAO, unsigned int cubeTexture, Shader &singleColorShader, unsigned int vegetationVAO, unsigned int transparentTexture, std::vector<glm::vec3> &vegetation);
 void DrawReflectiveCube(Shader &reflectiveContainerShader, unsigned int containerReflectVAO, unsigned int cubemapTexture);
+void DrawRefractiveCube(Shader &refractiveContainerShader, unsigned int containerRefractVAO, unsigned int cubemapTexture);
 void DrawSkybox(Shader &skyboxShader, unsigned int skyboxVAO, unsigned int cubemapTexture);
 void mouse_callback(GLFWwindow *window, double xpos, double ypos);
 void scroll_callback(GLFWwindow *window, double xoffset, double yoffset);
@@ -134,6 +135,7 @@ int main()
     Shader screenShader("assets/shaders/framebuffersBearMirror.vert", "assets/shaders/framebuffersBearMirror.frag");
     Shader skyboxShader("assets/shaders/cubemaps.vert", "assets/shaders/cubemaps.frag");
     Shader reflectiveContainerShader("assets/shaders/cubemapsContainerReflect.vert", "assets/shaders/cubemapsContainerReflect.frag");
+    Shader refractiveContainerShader("assets/shaders/cubemapsContainerRefract.vert", "assets/shaders/cubemapsContainerRefract.frag");
 
     float cubeVertices[] = {
         // positions          // texture Coords
@@ -482,6 +484,8 @@ int main()
         DrawScene(normalShader, planeVAO, floorTexture, cubeVAO, cubeTexture, singleColorShader, vegetationVAO, transparentTexture, vegetation);
         DrawReflectiveCube(reflectiveContainerShader, containerReflectVAO, cubemapTexture);
         backpack.Draw(reflectiveContainerShader);
+        DrawRefractiveCube(refractiveContainerShader, containerReflectVAO, cubemapTexture);
+        backpack.Draw(refractiveContainerShader);
         // Drawing skybox after objets is more efficient
         DrawSkybox(skyboxShader, skyboxVAO, cubemapTexture);
         screenShader.use();
@@ -540,6 +544,29 @@ void DrawReflectiveCube(Shader &reflectiveContainerShader, [[maybe_unused]] unsi
     reflectiveContainerShader.setMat4("model", model);
 
 }
+
+void DrawRefractiveCube(Shader &refractiveContainerShader, [[maybe_unused]] unsigned int containerRefractVAO, [[maybe_unused]] unsigned int cubemapTexture)
+{
+    // Drawing refractive container
+    refractiveContainerShader.use();
+    glm::mat4 model = glm::mat4(1.0f);
+    model = glm::translate(model, glm::vec3(2.0f, 1.5f, 0.0f));
+    // model = glm::rotate(model, glm::radians((float)glfwGetTime() * 20.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+    glm::mat4 view = camera.GetViewMatrix();
+    glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
+    refractiveContainerShader.setMat4("model", model);
+    refractiveContainerShader.setMat4("view", view);
+    refractiveContainerShader.setMat4("projection", projection);
+    refractiveContainerShader.setVec3("cameraPos", camera.Position);
+    glBindVertexArray(containerRefractVAO);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, cubemapTexture);
+    glDrawArrays(GL_TRIANGLES, 0, 36);
+    model = glm::translate(model, glm::vec3(2.0f, 3.5f, 0.0f));
+    refractiveContainerShader.setMat4("model", model);
+
+}
+
 void DrawSkybox(Shader &skyboxShader, unsigned int skyboxVAO, unsigned int cubemapTexture)
 {
     static bool mirrorPass = true;
