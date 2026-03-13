@@ -28,6 +28,7 @@ public:
     glm::vec3 Front;
     glm::vec3 Up;
     glm::vec3 Right;
+    glm::vec3 HorizontalFront;
     glm::vec3 WorldUp;
     // Euler Angles
     float Yaw;
@@ -49,7 +50,7 @@ public:
 
     glm::mat4 GetViewMatrix();
 
-    void ProcessKeyboard(Camera_Movement direction, float deltaTime);
+    void ProcessKeyboard(Camera_Movement direction, float deltaTime, bool useHorizontalFront = true, bool useWorldUp = true);
     void ProcessMouseMovement(float xoffset, float yoffset, bool constrainPitch = true);
     void ProcessMouseScroll(float yoffset);
     
