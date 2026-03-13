@@ -355,7 +355,7 @@ int main()
         screenShader.use();
         glBindVertexArray(quadVAO);
         glm::mat4 model = glm::mat4(1.0f);
-        model = glm::translate(model, glm::vec3(0.0f, 0.0f, -2.0f));
+        model = glm::translate(model, glm::vec3(-0.5f, 0.5f, -0.5f));
         // glm::mat4 view = glm::lookAt(camera.Position, (-camera.Front) - camera.Position, camera.Up);
         glm::mat4 view = camera.GetViewMatrix();
         glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
@@ -388,14 +388,30 @@ int main()
 
 void DrawScene(Shader &normalShader, unsigned int planeVAO, unsigned int floorTexture, unsigned int cubeVAO, unsigned int cubeTexture, Shader &singleColorShader, unsigned int vegetationVAO, unsigned int transparentTexture, std::vector<glm::vec3> &vegetation)
 {
+    static bool mirrorPass = true;
     // changing over time
     glm::mat4 trans = glm::mat4(1.0f);
     // trans = glm::translate(trans, glm::vec3(0.5f, -0.5f, 0.0f));
     // trans = glm::rotate(trans, (float)glfwGetTime(), glm::vec3(0.0f, 0.0f, 1.0f));
     glm::mat4 model = glm::mat4(1.0f);
-    glm::mat4 view = camera.GetViewMatrix();
+    glm::mat4 view = mirrorPass
+        ? glm::lookAt(camera.Position, camera.Position - camera.Front, camera.Up)
+        : camera.GetViewMatrix();
     glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
-
+    
+    if (mirrorPass)
+    {
+        // camera.Yaw += 180.0f;
+        // camera.updateCameraVectors(); // need de-privatize the method
+        // view = camera.GetViewMatrix();
+        // camera.Yaw -= 180.0f;
+        // camera.updateCameraVectors(); // the same as above
+        mirrorPass = false;
+    }
+    else
+    {
+        mirrorPass = true;
+    }
     normalShader.use();
     normalShader.setMat4("model", model);
     normalShader.setMat4("view", view);
@@ -460,6 +476,7 @@ void DrawScene(Shader &normalShader, unsigned int planeVAO, unsigned int floorTe
         sorted[distance] = vegetation[i];
     }
     // render
+    glDisable(GL_CULL_FACE); // disable backface culling for transparent objects
     for (auto it = sorted.rbegin(); it != sorted.rend(); ++it)
     {
         model = glm::mat4(1.0f);
@@ -467,6 +484,7 @@ void DrawScene(Shader &normalShader, unsigned int planeVAO, unsigned int floorTe
         normalShader.setMat4("model", model);
         glDrawArrays(GL_TRIANGLES, 0, 6);
     }
+    glEnable(GL_CULL_FACE);
 }
 
 void framebuffer_size_callback([[maybe_unused]] GLFWwindow *window, int width, int height)
