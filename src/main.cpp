@@ -38,6 +38,7 @@ void DrawReflectiveCube(Shader &reflectiveContainerShader, unsigned int containe
 void DrawRefractiveCube(Shader &refractiveContainerShader, unsigned int containerRefractVAO, unsigned int cubemapTexture);
 void DrawSkybox(Shader &skyboxShader, unsigned int skyboxVAO, unsigned int cubemapTexture);
 void DrawPoints(Shader &pointShader, unsigned int pointsVAO);
+void DrawColoredCube(Shader &fragCoordShader, unsigned int containerReflectVAO);
 void mouse_callback(GLFWwindow *window, double xpos, double ypos);
 void scroll_callback(GLFWwindow *window, double xoffset, double yoffset);
 void processInput(GLFWwindow *window);
@@ -138,6 +139,7 @@ int main()
     Shader reflectiveContainerShader("assets/shaders/cubemapsContainerReflect.vert", "assets/shaders/cubemapsContainerReflect.frag");
     Shader refractiveContainerShader("assets/shaders/cubemapsContainerRefract.vert", "assets/shaders/cubemapsContainerRefract.frag");
     Shader pointShader("assets/shaders/advancedGLSLPoints.vert", "assets/shaders/advancedGLSLPoints.frag");
+    Shader fragCoordShader("assets/shaders/advancedGLSLFragCoord.vert", "assets/shaders/advancedGLSLFragCoord.frag");
 
     float cubeVertices[] = {
         // positions          // texture Coords
@@ -508,6 +510,7 @@ int main()
         DrawRefractiveCube(refractiveContainerShader, containerReflectVAO, cubemapTexture);
         // backpack.Draw(refractiveContainerShader);
         // Drawing skybox after objets is more efficient
+        DrawColoredCube(fragCoordShader, containerReflectVAO);
         DrawPoints(pointShader, pointsVAO);
         DrawSkybox(skyboxShader, skyboxVAO, cubemapTexture);
         screenShader.use();
@@ -642,6 +645,20 @@ void DrawPoints(Shader &pointShader, unsigned int pointsVAO)
     pointShader.setMat4("projection", projection);
     glBindVertexArray(pointsVAO);
     glDrawArrays(GL_POINTS, 0, 5);
+}
+
+void DrawColoredCube(Shader &fragCoordShader, unsigned int containerReflectVAO)
+{
+    fragCoordShader.use();
+    glm::mat4 model = glm::mat4(1.0f);
+    model = glm::translate(model, glm::vec3(-2.0f, 0.0f, 3.0f));
+    glm::mat4 view = camera.GetViewMatrix();
+    glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
+    fragCoordShader.setMat4("model", model);
+    fragCoordShader.setMat4("view", view);
+    fragCoordShader.setMat4("projection", projection);
+    glBindVertexArray(containerReflectVAO);
+    glDrawArrays(GL_TRIANGLES, 0, 36);
 }
 
 void DrawScene(Shader &normalShader, unsigned int planeVAO, unsigned int floorTexture, unsigned int cubeVAO, unsigned int cubeTexture, Shader &singleColorShader, unsigned int vegetationVAO, unsigned int transparentTexture, std::vector<glm::vec3> &vegetation)
