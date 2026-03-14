@@ -75,7 +75,7 @@ bool wireframeEnabled = false;
 // Temporary variables needed
 // animation
 float rotationSpeed = 50.0f; // degrees per second
-
+glm::vec3 mirrorCenterPos(2.5f, 0.5f, -1.5f);
 glm::vec3 cubeColor(1.0f, 0.5f, 0.31f);
 // light things
 glm::vec3 lightPos(1.2f, 1.0f, 2.0f);
@@ -491,7 +491,7 @@ int main()
         screenShader.use();
         glBindVertexArray(quadVAO);
         glm::mat4 model = glm::mat4(1.0f);
-        model = glm::translate(model, glm::vec3(2.5f, 0.5f, -1.5f));
+        model = glm::translate(model, mirrorCenterPos);
         // glm::mat4 view = glm::lookAt(camera.Position, (-camera.Front) - camera.Position, camera.Up);
         model = glm::rotate(model, glm::radians(-90.0f), glm::vec3(0.0f, 1.0f, 0.0f));
         glm::mat4 view = camera.GetViewMatrix();
@@ -582,12 +582,12 @@ void DrawSkybox(Shader &skyboxShader, unsigned int skyboxVAO, unsigned int cubem
     glm::mat4 staticView = glm::mat4(1.0f); // remove translation from the view matrix
     if (mirrorPass)
     {
-        camera.Yaw += 180.0f;
-        camera.ProcessMouseMovement(0, 0, true); // need de-privatize the method
-        staticView = camera.GetViewMatrix();
-        // return the camera to original orientation for normal rendering
-        camera.Yaw -= 180.0f;
-        camera.ProcessMouseMovement(0, 0, true);       // need de-privatize the method
+        // camera.Yaw += 180.0f;
+        // camera.ProcessMouseMovement(0, 0, true); // need de-privatize the method
+        // staticView = camera.GetViewMatrix();
+        // // return the camera to original orientation for normal rendering
+        // camera.Yaw -= 180.0f;
+        // camera.ProcessMouseMovement(0, 0, true);       // need de-privatize the method
         staticView = glm::mat4(glm::mat3(staticView)); // remove translation from the view matrix
         mirrorPass = false;
     }
@@ -624,16 +624,11 @@ void DrawScene(Shader &normalShader, unsigned int planeVAO, unsigned int floorTe
 
     if (mirrorPass)
     {
-        // camera.Yaw += 180.0f;
-        // // camera.updateCameraVectors(); // need de-privatize the method
-        // view = camera.GetViewMatrix();
-        // camera.Yaw -= 180.0f;
-        // // camera.updateCameraVectors(); // the same as above
-        glm::vec3 position = glm::vec3(2.5f, 0.5f, -1.5f);
-        glm::vec3 normal = glm::vec3(-1.0f, 0.0f, 0.0f);
-        position = position - (glm::reflect(position - camera.Position, normal));
-        view = glm::lookAt(position, position + glm::reflect(camera.Front, normal), glm::reflect(camera.Up, normal));
-        // glm::mat4 view = glm::lookAt(camera.Position, (-camera.Front) - camera.Position, camera.Up);
+        glm::vec3 mirrorNormal = glm::vec3(-1.0f, 0.0f, 0.0f);
+        glm::vec3 cameraMirrorPos = mirrorCenterPos + glm::reflect(camera.Position - mirrorCenterPos, mirrorNormal);
+        glm::vec3 cameraMirrorFront = glm::reflect(camera.Front, mirrorNormal); // check
+        // pos target and up
+        view = glm::lookAt(cameraMirrorPos, cameraMirrorPos + cameraMirrorFront, camera.WorldUp);
         mirrorPass = false;
     }
     else
