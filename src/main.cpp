@@ -333,6 +333,7 @@ int main()
     Shader shaderYellow("assets/shaders/advancedGLSLYellow.vert", "assets/shaders/advancedGLSLYellow.frag");
     Shader shaderQuad("assets/shaders/framebuffersSimpleQuad.vert", "assets/shaders/framebuffersSimpleQuad.frag");
     Shader shaderUsingGeom("assets/shaders/geometryShaderExplode.vert", "assets/shaders/geometryShaderExplode.frag", "assets/shaders/geometryShaderExplode.geom");
+    Shader shaderJustNormals("assets/shaders/geometryShaderNormals.vert", "assets/shaders/geometryShaderNormals.frag", "assets/shaders/geometryShaderNormals.geom");
 
     // Set shader programs use the same values
     unsigned int uniformBlockIndexRed = glGetUniformBlockIndex(shaderRed.ID, "Matrices");
@@ -340,12 +341,14 @@ int main()
     unsigned int uniformBlockIndexBlue = glGetUniformBlockIndex(shaderBlue.ID, "Matrices");
     unsigned int uniformBlockIndexYellow = glGetUniformBlockIndex(shaderYellow.ID, "Matrices");
     unsigned int uniformBlockIndexUsingGeom = glGetUniformBlockIndex(shaderUsingGeom.ID, "Matrices");
+    unsigned int uniformBlockIndexJustNormals = glGetUniformBlockIndex(shaderJustNormals.ID, "Matrices");
 
     glUniformBlockBinding(shaderRed.ID, uniformBlockIndexRed, 0);
     glUniformBlockBinding(shaderGreen.ID, uniformBlockIndexGreen, 0);
     glUniformBlockBinding(shaderBlue.ID, uniformBlockIndexBlue, 0);
     glUniformBlockBinding(shaderYellow.ID, uniformBlockIndexYellow, 0);
     glUniformBlockBinding(shaderUsingGeom.ID, uniformBlockIndexUsingGeom, 0);
+    glUniformBlockBinding(shaderJustNormals.ID, uniformBlockIndexJustNormals, 0);
 
     // cubeVAO
     unsigned int cubeVAO, cubeVBO;
@@ -573,9 +576,13 @@ int main()
         shaderUsingGeom.use();
         model = glm::mat4(1.0f);
         shaderUsingGeom.setMat4("model", model);
-        shaderUsingGeom.setFloat("time", static_cast<float>(glfwGetTime()));
-        // shaderUsingGeom.setFloat("time", 0.0f);
+        // shaderUsingGeom.setFloat("time", static_cast<float>(glfwGetTime()));
+        // for testing normals, set constant so no position change
+        shaderUsingGeom.setFloat("time", glm::radians(90.0f));
         backpackModel.Draw(shaderUsingGeom);
+        shaderJustNormals.use();
+        shaderJustNormals.setMat4("model", model);
+        backpackModel.Draw(shaderJustNormals);
 
 
         // Now the window's framebuffer default
