@@ -56,8 +56,8 @@ void imgui_frame_render();
 void imgui_frame_shutdown();
 
 // settings
-const unsigned int SCR_WIDTH = 800;
-const unsigned int SCR_HEIGHT = 600;
+unsigned int SCR_WIDTH = 800;
+unsigned int SCR_HEIGHT = 600;
 
 // Camera
 glm::vec3 cameraPos = glm::vec3(0.0f, 0.0f, 3.0f);
@@ -98,7 +98,7 @@ int main()
 
     glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, true);
     glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
-    
+
     GLFWwindow *window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "LearnOpenGL", NULL, NULL);
     if (window == NULL)
     {
@@ -313,16 +313,22 @@ int main()
         -0.5f, 0.5f, 1.0f, 0.0f, 0.0f, // top-left
         0.5f, 0.5f, 0.0f, 1.0f, 0.0f,  // top-right
         0.5f, -0.5f, 0.0f, 0.0f, 1.0f, // bottom-right
-        -0.5f, -0.5f, 1.0f, 1.0f, 0.0f  // bottom-left
+        -0.5f, -0.5f, 1.0f, 1.0f, 0.0f // bottom-left
     };
 
-    std::vector<std::string> faces = {
-        "assets/textures/skybox/right.jpg",
-        "assets/textures/skybox/left.jpg",
-        "assets/textures/skybox/top.jpg",
-        "assets/textures/skybox/bottom.jpg",
-        "assets/textures/skybox/front.jpg",
-        "assets/textures/skybox/back.jpg"};
+    float instancingQuadVertices[] = {
+        // positions     // colors
+        -0.05f, 0.05f, 1.0f, 0.0f, 0.0f,
+        -0.05f, -0.05f, 0.0f, 0.0f, 1.0f,
+        0.05f, -0.05f, 0.0f, 1.0f, 0.0f,
+
+        -0.05f, 0.05f, 1.0f, 0.0f, 0.0f,
+        0.05f, -0.05f, 0.0f, 1.0f, 0.0f,
+        0.05f, 0.05f, 0.0f, 1.0f, 1.0f // 
+    };
+
+    std::vector<std::string>
+        faces = {"assets/textures/skybox/right.jpg", "assets/textures/skybox/left.jpg", "assets/textures/skybox/top.jpg", "assets/textures/skybox/bottom.jpg", "assets/textures/skybox/front.jpg", "assets/textures/skybox/back.jpg"};
     // Models
     stbi_set_flip_vertically_on_load(true);
     Model backpackModel("assets/objects/backpack/backpack.obj");
@@ -334,6 +340,7 @@ int main()
     Shader shaderQuad("assets/shaders/framebuffersSimpleQuad.vert", "assets/shaders/framebuffersSimpleQuad.frag");
     Shader shaderUsingGeom("assets/shaders/geometryShaderExplode.vert", "assets/shaders/geometryShaderExplode.frag", "assets/shaders/geometryShaderExplode.geom");
     Shader shaderJustNormals("assets/shaders/geometryShaderNormals.vert", "assets/shaders/geometryShaderNormals.frag", "assets/shaders/geometryShaderNormals.geom");
+    Shader shaderInstancingQuad("assets/shaders/instancingQuad.vert", "assets/shaders/instancingQuad.frag");
 
     // Set shader programs use the same values
     unsigned int uniformBlockIndexRed = glGetUniformBlockIndex(shaderRed.ID, "Matrices");
@@ -442,7 +449,18 @@ int main()
     glEnableVertexAttribArray(1);
     glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void *)(2 * sizeof(float)));
     glBindVertexArray(0);
-
+    // instancing quad VAO, VBO
+    unsigned int instancingQuadVAO, instancingQuadVBO;
+    glGenVertexArrays(1, &instancingQuadVAO);
+    glGenBuffers(1, &instancingQuadVBO);
+    glBindVertexArray(instancingQuadVAO);
+    glBindBuffer(GL_ARRAY_BUFFER, instancingQuadVBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(instancingQuadVertices), &instancingQuadVertices, GL_STATIC_DRAW);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void *)0);
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void *)(2 * sizeof(float)));
+    glBindVertexArray(0);
     // UBO's
     unsigned int uboMatrices;
     glGenBuffers(1, &uboMatrices);
@@ -517,10 +535,6 @@ int main()
     glfwShowWindow(window);
     glfwSetCursorPos(window, SCR_WIDTH / 2.0, SCR_HEIGHT / 2.0);
 
-    // setting uniforms that won't change in the render loop
-    glBindBuffer(GL_UNIFORM_BUFFER, uboMatrices);
-    glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
-    glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(glm::mat4), glm::value_ptr(projection));
     // now view
     glm::mat4 view = camera.GetViewMatrix();
     glBufferSubData(GL_UNIFORM_BUFFER, sizeof(glm::mat4), sizeof(glm::mat4), glm::value_ptr(view));
@@ -531,9 +545,31 @@ int main()
     glm::vec3 greenCubePos(0.75f, 0.75f, 0.0f);
     glm::vec3 blueCubePos(-0.75f, -0.75f, 0.0f);
     glm::vec3 yellowCubePos(0.75f, -0.75f, 0.0f);
+    glm::vec2 translation[100];
+    int index = 0;
+    float offset = 0.1f;
+    for (int y = -10; y < 10; y += 2)
+    {
+        for (int x = -10; x < 10; x += 2)
+        {
+            glm::vec2 pos;
+            pos.x = static_cast<float>(x) / 10.0f + offset;
+            pos.y = static_cast<float>(y) / 10.0f + offset;
+            translation[index++] = pos;
+        }
+    }
+    shaderInstancingQuad.use();
+    for (unsigned int i = 0; i < 100; i++)
+    {
+        shaderInstancingQuad.setVec2("offsets[" + std::to_string(i) + "]", translation[i]);
+    }
 
     while (!glfwWindowShouldClose(window))
     {
+        // setting uniforms that won't change in the render loop
+        glBindBuffer(GL_UNIFORM_BUFFER, uboMatrices);
+        glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
+        glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(glm::mat4), glm::value_ptr(projection));
         processInput(window);
         calculateDeltaTime();
         // FPS counter
@@ -584,6 +620,10 @@ int main()
         shaderJustNormals.setMat4("model", model);
         backpackModel.Draw(shaderJustNormals);
 
+        // quads
+        shaderInstancingQuad.use();
+        glBindVertexArray(instancingQuadVAO);
+        glDrawArraysInstanced(GL_TRIANGLES, 0, 6, 100);
 
         // Now the window's framebuffer default
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -622,6 +662,8 @@ int main()
 
 void framebuffer_size_callback([[maybe_unused]] GLFWwindow *window, int width, int height)
 {
+    SCR_WIDTH = width;
+    SCR_HEIGHT = height;
     glViewport(0, 0, width, height);
 }
 
