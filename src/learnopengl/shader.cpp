@@ -134,11 +134,17 @@ void Shader::checkCompileErrors(unsigned int shader, std::string type)
     int success;
     char infoLog[512];
     bool isProgram = (type == "PROGRAM");
-    glGetShaderiv(shader, isProgram ? GL_LINK_STATUS : GL_COMPILE_STATUS, &success);
+    if (isProgram)
+        glGetProgramiv(shader, GL_LINK_STATUS, &success);
+    else
+        glGetShaderiv(shader, GL_COMPILE_STATUS, &success);
     if (!success)
     {
+        if (isProgram)
+            glGetProgramInfoLog(shader, 512, NULL, infoLog);
+        else
+            glGetShaderInfoLog(shader, 512, NULL, infoLog);
         std::string errorProcess = isProgram ? "PROGRAM_LINKING_ERROR" : "SHADER_COMPILATION_ERROR";
-        glGetShaderInfoLog(shader, 512, NULL, infoLog);
         std::cout << "ERROR::" << errorProcess << " of type: " << type << "\n"
                   << infoLog << "\n -- --------------------------------------------------- -- " << std::endl;
     }
