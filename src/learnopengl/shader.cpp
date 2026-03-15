@@ -7,16 +7,20 @@
 #include <iostream>
 #include <sstream>
 
-Shader::Shader(const char *vertexPath, const char *fragmentPath)
+Shader::Shader(const char *vertexPath, const char *fragmentPath, const char *geometryPath)
 {
+    bool hasGeometryShaderFile = geometryPath != nullptr;
     // 1. retrieve the vertex/fragment source code from filePath
     std::string vertexCode;
     std::string fragmentCode;
+    std::string geometryCode;
     std::ifstream vShaderFile;
     std::ifstream fShaderFile;
+    std::ifstream gShaderFile;
     // ensure ifstream objects can throw exceptions:
     vShaderFile.exceptions(std::ifstream::failbit | std::ifstream::badbit);
     fShaderFile.exceptions(std::ifstream::failbit | std::ifstream::badbit);
+    gShaderFile.exceptions(std::ifstream::failbit | std::ifstream::badbit);
     try
     {
         // open files
@@ -32,6 +36,15 @@ Shader::Shader(const char *vertexPath, const char *fragmentPath)
         // convert stream into string
         vertexCode = vShaderStream.str();
         fragmentCode = fShaderStream.str();
+        // if geometry shader path is present
+        if (hasGeometryShaderFile)
+        {
+            gShaderFile.open(geometryPath);
+            std::stringstream gShaderStream;
+            gShaderStream << gShaderFile.rdbuf();
+            gShaderFile.close();
+            geometryCode = gShaderStream.str();
+        }
     }
     catch (std::ifstream::failure e)
     {
@@ -41,52 +54,47 @@ Shader::Shader(const char *vertexPath, const char *fragmentPath)
     const char *fShaderCode = fragmentCode.c_str();
     // 2. compile shaders
     unsigned int vertex, fragment;
-    int success;
-    char infoLog[512];
 
     // vertex Shader
     vertex = glCreateShader(GL_VERTEX_SHADER);
     glShaderSource(vertex, 1, &vShaderCode, NULL);
     glCompileShader(vertex);
     // print compile errors if any
-    glGetShaderiv(vertex, GL_COMPILE_STATUS, &success);
-    if (!success)
-    {
-        glGetShaderInfoLog(vertex, 512, NULL, infoLog);
-        std::cout << "ERROR::SHADER::VERTEX::COMPILATION_FAILED\n"
-                  << infoLog << std::endl;
-    };
+    checkCompileErrors(vertex, "VERTEX");
 
     // similiar for Fragment Shader
     fragment = glCreateShader(GL_FRAGMENT_SHADER);
     glShaderSource(fragment, 1, &fShaderCode, NULL);
     glCompileShader(fragment);
     // print compile errors if any
-    glGetShaderiv(fragment, GL_COMPILE_STATUS, &success);
-    if (!success)
+    checkCompileErrors(fragment, "FRAGMENT");
+
+    // if geometry shader is given, compile geometry shader
+    unsigned int geometry;
+    if (hasGeometryShaderFile)
     {
-        glGetShaderInfoLog(fragment, 512, NULL, infoLog);
-        std::cout << "ERROR::SHADER::FRAGMENT::COMPILATION_FAILED\n"
-                  << infoLog << std::endl;
-    };
+        const char *gShaderCode = geometryCode.c_str();
+        geometry = glCreateShader(GL_GEOMETRY_SHADER);
+        glShaderSource(geometry, 1, &gShaderCode, NULL);
+        glCompileShader(geometry);
+        checkCompileErrors(geometry, "GEOMETRY");
+    }
 
     // shader Program
     ID = glCreateProgram();
     glAttachShader(ID, vertex);
     glAttachShader(ID, fragment);
+    if (hasGeometryShaderFile)
+        glAttachShader(ID, geometry);
     glLinkProgram(ID);
     // print linking errors if any
-    glGetProgramiv(ID, GL_LINK_STATUS, &success);
-    if (!success)
-    {
-        glGetProgramInfoLog(ID, 512, NULL, infoLog);
-        std::cout << "ERROR::SHADER::PROGRAM::LINKING_FAILED\n"
-                  << infoLog << std::endl;
-    }
+    checkCompileErrors(ID, "PROGRAM");
 
     // delete the shaders as they're linked into our program now and no longer necessary
     glDeleteShader(vertex);
     glDeleteShader(fragment);
+    if (hasGeometryShaderFile)
+        glDeleteShader(geometry);
 }
 
 void Shader::use()
@@ -119,4 +127,18 @@ void Shader::setVec3(const std::string &name, const glm::vec3 &value) const
 void Shader::setMat4(const std::string &name, const glm::mat4 &mat) const
 {
     glUniformMatrix4fv(glGetUniformLocation(ID, name.c_str()), 1, GL_FALSE, &mat[0][0]);
+}
+void Shader::checkCompileErrors(unsigned int shader, std::string type)
+{
+    int success;
+    char infoLog[512];
+    bool isProgram = (type == "PROGRAM");
+    glGetShaderiv(shader, isProgram ? GL_LINK_STATUS : GL_COMPILE_STATUS, &success);
+    if (!success)
+    {
+        std::string errorProcess = isProgram ? "PROGRAM_LINKING_ERROR" : "SHADER_COMPILATION_ERROR";
+        glGetShaderInfoLog(shader, 512, NULL, infoLog);
+        std::cout << "ERROR::" << errorProcess << " of type: " << type << "\n"
+                  << infoLog << "\n -- --------------------------------------------------- -- " << std::endl;
+    }
 }
