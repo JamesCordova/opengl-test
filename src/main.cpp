@@ -310,10 +310,10 @@ int main()
     };
 
     float geometryPoints[] = {
-        -0.5f, 0.5f, // top-left
-        0.5f, 0.5f,  // top-right
-        0.5f, -0.5f, // bottom-right
-        -0.5f, -0.5f // bottom-left
+        -0.5f, 0.5f, 1.0f, 0.0f, 0.0f, // top-left
+        0.5f, 0.5f, 0.0f, 1.0f, 0.0f,  // top-right
+        0.5f, -0.5f, 0.0f, 0.0f, 1.0f, // bottom-right
+        -0.5f, -0.5f, 1.0f, 1.0f, 0.0f  // bottom-left
     };
 
     std::vector<std::string> faces = {
@@ -431,7 +431,9 @@ int main()
     glBindBuffer(GL_ARRAY_BUFFER, geometryPointsVBO);
     glBufferData(GL_ARRAY_BUFFER, sizeof(geometryPoints), &geometryPoints, GL_STATIC_DRAW);
     glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void *)0);
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void *)0);
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void *)(2 * sizeof(float)));
     glBindVertexArray(0);
 
     // UBO's
