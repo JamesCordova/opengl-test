@@ -70,7 +70,8 @@ Shader::Shader(const char *vertexPath, const char *fragmentPath, const char *geo
     checkCompileErrors(fragment, "FRAGMENT");
 
     // if geometry shader is given, compile geometry shader
-    unsigned int geometry;
+    // for glCreate... and glGen... ID's like 0 are reserved for errors
+    unsigned int geometry = 0;
     if (hasGeometryShaderFile)
     {
         const char *gShaderCode = geometryCode.c_str();
@@ -84,8 +85,7 @@ Shader::Shader(const char *vertexPath, const char *fragmentPath, const char *geo
     ID = glCreateProgram();
     glAttachShader(ID, vertex);
     glAttachShader(ID, fragment);
-    if (hasGeometryShaderFile)
-        glAttachShader(ID, geometry);
+    glAttachShader(ID, geometry); // if 0 is passed, the shader will be ignored
     glLinkProgram(ID);
     // print linking errors if any
     checkCompileErrors(ID, "PROGRAM");
@@ -93,8 +93,7 @@ Shader::Shader(const char *vertexPath, const char *fragmentPath, const char *geo
     // delete the shaders as they're linked into our program now and no longer necessary
     glDeleteShader(vertex);
     glDeleteShader(fragment);
-    if (hasGeometryShaderFile)
-        glDeleteShader(geometry);
+    glDeleteShader(geometry); // if 0 is passed, the shader will be ignored
 }
 
 void Shader::use()
