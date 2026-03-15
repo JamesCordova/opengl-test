@@ -80,12 +80,13 @@ Shader::Shader(const char *vertexPath, const char *fragmentPath, const char *geo
         glCompileShader(geometry);
         checkCompileErrors(geometry, "GEOMETRY");
     }
-
+    bool hasGeometryValidID = geometry != 0;
     // shader Program
     ID = glCreateProgram();
     glAttachShader(ID, vertex);
     glAttachShader(ID, fragment);
-    glAttachShader(ID, geometry); // if 0 is passed, the shader will be ignored
+    if (hasGeometryValidID)
+        glAttachShader(ID, geometry); // if 0 is passed, the shader will be ignored
     glLinkProgram(ID);
     // print linking errors if any
     checkCompileErrors(ID, "PROGRAM");
@@ -93,7 +94,8 @@ Shader::Shader(const char *vertexPath, const char *fragmentPath, const char *geo
     // delete the shaders as they're linked into our program now and no longer necessary
     glDeleteShader(vertex);
     glDeleteShader(fragment);
-    glDeleteShader(geometry); // if 0 is passed, the shader will be ignored
+    if (hasGeometryValidID)
+        glDeleteShader(geometry); // if 0 is passed, the shader will be ignored
 }
 
 void Shader::use()
