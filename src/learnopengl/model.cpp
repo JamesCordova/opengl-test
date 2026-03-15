@@ -133,7 +133,10 @@ Mesh Model::processMesh(aiMesh *mesh, const aiScene *scene)
             indices.push_back(face.mIndices[j]);
     }
     // process materials
-    if (mesh->mMaterialIndex)
+    // as far as i know assimp stores material doesnt use index 0 (can change)
+    // we could check just for the (nMaterialIndex) if 0 then no material,
+    // for safety we compare it with the nNumMaterials as well
+    if (mesh->mMaterialIndex < scene->mNumMaterials)
     {
         aiMaterial *material = scene->mMaterials[mesh->mMaterialIndex];
         std::vector<Texture> diffuseMaps = loadMaterialTextures(material, aiTextureType_DIFFUSE, "texture_diffuse");
