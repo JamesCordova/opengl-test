@@ -309,6 +309,13 @@ int main()
         0.0f, -0.5f, 0.0f  // point bottom
     };
 
+    float geometryPoints[] = {
+        -0.5f, 0.5f, // top-left
+        0.5f, 0.5f,  // top-right
+        0.5f, -0.5f, // bottom-right
+        -0.5f, -0.5f // bottom-left
+    };
+
     std::vector<std::string> faces = {
         "assets/textures/skybox/right.jpg",
         "assets/textures/skybox/left.jpg",
@@ -323,6 +330,7 @@ int main()
     Shader shaderBlue("assets/shaders/advancedGLSLBlue.vert", "assets/shaders/advancedGLSLBlue.frag");
     Shader shaderYellow("assets/shaders/advancedGLSLYellow.vert", "assets/shaders/advancedGLSLYellow.frag");
     Shader shaderQuad("assets/shaders/framebuffersSimpleQuad.vert", "assets/shaders/framebuffersSimpleQuad.frag");
+    Shader shaderUsingGeom("assets/shaders/geometryShader.vert", "assets/shaders/geometryShader.frag", "assets/shaders/geometryShader.geom");
 
     // Set shader programs use the same values
     unsigned int uniformBlockIndexRed = glGetUniformBlockIndex(shaderRed.ID, "Matrices");
@@ -414,6 +422,16 @@ int main()
     glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), &vertices, GL_STATIC_DRAW);
     glEnableVertexAttribArray(0);
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void *)0);
+    glBindVertexArray(0);
+    // geometry points VAO, VBO
+    unsigned int geometryPointsVAO, geometryPointsVBO;
+    glGenVertexArrays(1, &geometryPointsVAO);
+    glGenBuffers(1, &geometryPointsVBO);
+    glBindVertexArray(geometryPointsVAO);
+    glBindBuffer(GL_ARRAY_BUFFER, geometryPointsVBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(geometryPoints), &geometryPoints, GL_STATIC_DRAW);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void *)0);
     glBindVertexArray(0);
 
     // UBO's
@@ -525,27 +543,30 @@ int main()
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
 
         // Draw
-        glBindVertexArray(cubeVAO);
-        shaderRed.use();
-        model = glm::mat4(1.0f);
-        model = glm::translate(model, redCubePos);
-        shaderRed.setMat4("model", model);
-        glDrawArrays(GL_TRIANGLES, 0, 36);
-        shaderGreen.use();
-        model = glm::mat4(1.0f);
-        model = glm::translate(model, greenCubePos);
-        shaderGreen.setMat4("model", model);
-        glDrawArrays(GL_TRIANGLES, 0, 36);
-        shaderBlue.use();
-        model = glm::mat4(1.0f);
-        model = glm::translate(model, blueCubePos);
-        shaderBlue.setMat4("model", model);
-        glDrawArrays(GL_TRIANGLES, 0, 36);
-        shaderYellow.use();
-        model = glm::mat4(1.0f);
-        model = glm::translate(model, yellowCubePos);
-        shaderYellow.setMat4("model", model);
-        glDrawArrays(GL_TRIANGLES, 0, 36);
+        // glBindVertexArray(cubeVAO);
+        // shaderRed.use();
+        // model = glm::mat4(1.0f);
+        // model = glm::translate(model, redCubePos);
+        // shaderRed.setMat4("model", model);
+        // glDrawArrays(GL_TRIANGLES, 0, 36);
+        // shaderGreen.use();
+        // model = glm::mat4(1.0f);
+        // model = glm::translate(model, greenCubePos);
+        // shaderGreen.setMat4("model", model);
+        // glDrawArrays(GL_TRIANGLES, 0, 36);
+        // shaderBlue.use();
+        // model = glm::mat4(1.0f);
+        // model = glm::translate(model, blueCubePos);
+        // shaderBlue.setMat4("model", model);
+        // glDrawArrays(GL_TRIANGLES, 0, 36);
+        // shaderYellow.use();
+        // model = glm::mat4(1.0f);
+        // model = glm::translate(model, yellowCubePos);
+        // shaderYellow.setMat4("model", model);
+        // glDrawArrays(GL_TRIANGLES, 0, 36);
+        glBindVertexArray(geometryPointsVAO);
+        shaderUsingGeom.use();
+        glDrawArrays(GL_POINTS, 0, 4);
         glBindVertexArray(0);
 
         // Now the window's framebuffer default
