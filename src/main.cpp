@@ -98,7 +98,7 @@ int main()
 
     glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, true);
     glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
-
+    
     GLFWwindow *window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "LearnOpenGL", NULL, NULL);
     if (window == NULL)
     {
@@ -573,10 +573,15 @@ int main()
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
         glClearColor(0.2f, 0.3f, 0.5f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        // by default
+        // force to not show the quad in wireframe
+        glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
         shaderQuad.use();
         glBindVertexArray(quadVAO);
         glBindTexture(GL_TEXTURE_2D, textureColorBuffer);
         glDrawArrays(GL_TRIANGLES, 0, 6);
+        // needed to update based on bool
+        glPolygonMode(GL_FRONT_AND_BACK, wireframeEnabled ? GL_LINE : GL_FILL);
 
         // new frame for imgui
         imgui_frame_new();
