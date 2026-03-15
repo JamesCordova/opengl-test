@@ -323,25 +323,29 @@ int main()
         "assets/textures/skybox/bottom.jpg",
         "assets/textures/skybox/front.jpg",
         "assets/textures/skybox/back.jpg"};
-
+    // Models
+    stbi_set_flip_vertically_on_load(true);
+    Model backpackModel("assets/objects/backpack/backpack.obj");
     // Implementation
     Shader shaderRed("assets/shaders/advancedGLSLRed.vert", "assets/shaders/advancedGLSLRed.frag");
     Shader shaderGreen("assets/shaders/advancedGLSLGreen.vert", "assets/shaders/advancedGLSLGreen.frag");
     Shader shaderBlue("assets/shaders/advancedGLSLBlue.vert", "assets/shaders/advancedGLSLBlue.frag");
     Shader shaderYellow("assets/shaders/advancedGLSLYellow.vert", "assets/shaders/advancedGLSLYellow.frag");
     Shader shaderQuad("assets/shaders/framebuffersSimpleQuad.vert", "assets/shaders/framebuffersSimpleQuad.frag");
-    Shader shaderUsingGeom("assets/shaders/geometryShader.vert", "assets/shaders/geometryShader.frag", "assets/shaders/geometryShader.geom");
+    Shader shaderUsingGeom("assets/shaders/geometryShaderExplode.vert", "assets/shaders/geometryShaderExplode.frag", "assets/shaders/geometryShaderExplode.geom");
 
     // Set shader programs use the same values
     unsigned int uniformBlockIndexRed = glGetUniformBlockIndex(shaderRed.ID, "Matrices");
     unsigned int uniformBlockIndexGreen = glGetUniformBlockIndex(shaderGreen.ID, "Matrices");
     unsigned int uniformBlockIndexBlue = glGetUniformBlockIndex(shaderBlue.ID, "Matrices");
     unsigned int uniformBlockIndexYellow = glGetUniformBlockIndex(shaderYellow.ID, "Matrices");
+    unsigned int uniformBlockIndexUsingGeom = glGetUniformBlockIndex(shaderUsingGeom.ID, "Matrices");
 
     glUniformBlockBinding(shaderRed.ID, uniformBlockIndexRed, 0);
     glUniformBlockBinding(shaderGreen.ID, uniformBlockIndexGreen, 0);
     glUniformBlockBinding(shaderBlue.ID, uniformBlockIndexBlue, 0);
     glUniformBlockBinding(shaderYellow.ID, uniformBlockIndexYellow, 0);
+    glUniformBlockBinding(shaderUsingGeom.ID, uniformBlockIndexUsingGeom, 0);
 
     // cubeVAO
     unsigned int cubeVAO, cubeVBO;
@@ -566,10 +570,13 @@ int main()
         // model = glm::translate(model, yellowCubePos);
         // shaderYellow.setMat4("model", model);
         // glDrawArrays(GL_TRIANGLES, 0, 36);
-        glBindVertexArray(geometryPointsVAO);
         shaderUsingGeom.use();
-        glDrawArrays(GL_POINTS, 0, 4);
-        glBindVertexArray(0);
+        model = glm::mat4(1.0f);
+        shaderUsingGeom.setMat4("model", model);
+        shaderUsingGeom.setFloat("time", static_cast<float>(glfwGetTime()));
+        // shaderUsingGeom.setFloat("time", 0.0f);
+        backpackModel.Draw(shaderUsingGeom);
+
 
         // Now the window's framebuffer default
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
