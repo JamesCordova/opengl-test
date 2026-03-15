@@ -122,24 +122,13 @@ int main()
 
     enableReportGlErrors();
 
-    // Configure global opengl state
-    glEnable(GL_DEPTH_TEST);
-    glEnable(GL_STENCIL_TEST);
     // Test output
     std::cout << "Hello, OpenGL!" << std::endl;
 
     // Imgui setup
     imgui_frame_init(window);
 
-    // Implementation
-    Shader normalShader("assets/shaders/blendingFunc.vert", "assets/shaders/blendingFunc.frag");
-    Shader singleColorShader("assets/shaders/simpleOutline.vert", "assets/shaders/simpleOutline.frag");
-    Shader screenShader("assets/shaders/framebuffersBearMirror.vert", "assets/shaders/framebuffersBearMirror.frag");
-    Shader skyboxShader("assets/shaders/cubemaps.vert", "assets/shaders/cubemaps.frag");
-    Shader reflectiveContainerShader("assets/shaders/cubemapsContainerReflect.vert", "assets/shaders/cubemapsContainerReflect.frag");
-    Shader refractiveContainerShader("assets/shaders/cubemapsContainerRefract.vert", "assets/shaders/cubemapsContainerRefract.frag");
-    Shader pointShader("assets/shaders/advancedGLSLPoints.vert", "assets/shaders/advancedGLSLPoints.frag");
-    Shader fragCoordShader("assets/shaders/advancedGLSLFragCoord.vert", "assets/shaders/advancedGLSLFragCoord.frag");
+    // data for all the vertices
 
     float cubeVertices[] = {
         // positions          // texture Coords
@@ -316,8 +305,8 @@ int main()
         0.0f, 0.0f, 0.0f,  // point at center
         -0.5f, 0.0f, 0.0f, // point left
         0.5f, 0.0f, 0.0f,  // point right
-        0.0f, 0.5f, 0.0f,  // point top 
-        0.0f, -0.5f, 0.0f   // point bottom
+        0.0f, 0.5f, 0.0f,  // point top
+        0.0f, -0.5f, 0.0f  // point bottom
     };
 
     std::vector<std::string> faces = {
@@ -327,6 +316,24 @@ int main()
         "assets/textures/skybox/bottom.jpg",
         "assets/textures/skybox/front.jpg",
         "assets/textures/skybox/back.jpg"};
+
+    // Implementation
+    Shader shaderRed("assets/shaders/advancedGLSLRed.vert", "assets/shaders/advancedGLSLRed.frag");
+    Shader shaderGreen("assets/shaders/advancedGLSLGreen.vert", "assets/shaders/advancedGLSLGreen.frag");
+    Shader shaderBlue("assets/shaders/advancedGLSLBlue.vert", "assets/shaders/advancedGLSLBlue.frag");
+    Shader shaderYellow("assets/shaders/advancedGLSLYellow.vert", "assets/shaders/advancedGLSLYellow.frag");
+    Shader shaderQuad("assets/shaders/framebuffersSimpleQuad.vert", "assets/shaders/framebuffersSimpleQuad.frag");
+
+    // Set shader programs use the same values
+    unsigned int uniformBlockIndexRed = glGetUniformBlockIndex(shaderRed.ID, "Matrices");
+    unsigned int uniformBlockIndexGreen = glGetUniformBlockIndex(shaderGreen.ID, "Matrices");
+    unsigned int uniformBlockIndexBlue = glGetUniformBlockIndex(shaderBlue.ID, "Matrices");
+    unsigned int uniformBlockIndexYellow = glGetUniformBlockIndex(shaderYellow.ID, "Matrices");
+
+    glUniformBlockBinding(shaderRed.ID, uniformBlockIndexRed, 0);
+    glUniformBlockBinding(shaderGreen.ID, uniformBlockIndexGreen, 0);
+    glUniformBlockBinding(shaderBlue.ID, uniformBlockIndexBlue, 0);
+    glUniformBlockBinding(shaderYellow.ID, uniformBlockIndexYellow, 0);
 
     // cubeVAO
     unsigned int cubeVAO, cubeVBO;
@@ -409,15 +416,19 @@ int main()
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void *)0);
     glBindVertexArray(0);
 
+    // UBO's
+    unsigned int uboMatrices;
+    glGenBuffers(1, &uboMatrices);
+
+    glBindBuffer(GL_UNIFORM_BUFFER, uboMatrices);
+    glBufferData(GL_UNIFORM_BUFFER, 2 * sizeof(glm::mat4), NULL, GL_STATIC_DRAW);
+    glBindBuffer(GL_UNIFORM_BUFFER, 0);
+
+    glBindBufferRange(GL_UNIFORM_BUFFER, 0, uboMatrices, 0, 2 * sizeof(glm::mat4));
+
     // Load Textures
     // stbi_set_flip_vertically_on_load(true);
-    unsigned int cubeTexture = loadTexture("assets/textures/marble.jpg");
-    unsigned int floorTexture = loadTexture("assets/textures/metal.png");
-    // unsigned int vegetationTexture = loadTexture("assets/textures/grass.png");
-    unsigned int transparentTexture = loadTexture("assets/textures/blending_transparent_window.png");
-    // unsigned int containerTexture = loadTexture("assets/textures/container.jpg");
-    unsigned int cubemapTexture = loadCubemap(faces);
-    // Model backpack = Model("assets/objects/backpack/backpack.obj");
+    // unsigned int cubeTexture = loadTexture("assets/textures/marble.jpg");
 
     // framebuffers
     unsigned int framebuffer;
@@ -458,20 +469,10 @@ int main()
     // glDeleteFramebuffers(1, &framebuffer);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
-    // Shader configuration
-    normalShader.use();
-    normalShader.setInt("texture1", 0);
-
     // finish
-    // set the model, view, and projection matrices in the shader
-
-    // mouse input, set cursor to center of screen
-    glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
-    glfwSwapBuffers(window);
-    glfwShowWindow(window);
-    glfwSetCursorPos(window, SCR_WIDTH / 2.0, SCR_HEIGHT / 2.0);
-
+    // Configure global opengl state
+    glEnable(GL_DEPTH_TEST);
+    glEnable(GL_STENCIL_TEST);
     // glDepthMask(GL_FALSE);
     glDepthFunc(GL_LESS); // change depth function so depth test passes when values are equal to depth buffer's content
     // blending
@@ -482,6 +483,28 @@ int main()
     // glCullFace(GL_FRONT);
     glEnable(GL_PROGRAM_POINT_SIZE);
 
+    // mouse input, set cursor to center of screen
+    glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
+    glfwSwapBuffers(window);
+    glfwShowWindow(window);
+    glfwSetCursorPos(window, SCR_WIDTH / 2.0, SCR_HEIGHT / 2.0);
+
+    // setting uniforms that won't change in the render loop
+    glBindBuffer(GL_UNIFORM_BUFFER, uboMatrices);
+    glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
+    glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(glm::mat4), glm::value_ptr(projection));
+    // now view
+    glm::mat4 view = camera.GetViewMatrix();
+    glBufferSubData(GL_UNIFORM_BUFFER, sizeof(glm::mat4), sizeof(glm::mat4), glm::value_ptr(view));
+    glBindBuffer(GL_UNIFORM_BUFFER, 0);
+    // defined
+    glm::mat4 model = glm::mat4(1.0f);
+    glm::vec3 redCubePos(-0.75f, 0.75f, 0.0f);
+    glm::vec3 greenCubePos(0.75f, 0.75f, 0.0f);
+    glm::vec3 blueCubePos(-0.75f, -0.75f, 0.0f);
+    glm::vec3 yellowCubePos(0.75f, -0.75f, 0.0f);
+
     while (!glfwWindowShouldClose(window))
     {
         processInput(window);
@@ -489,41 +512,48 @@ int main()
         // FPS counter
         std::string currentFps = std::to_string(1.0f / deltaTime) + " FPS";
 
+        // now view
+        glBindBuffer(GL_UNIFORM_BUFFER, uboMatrices);
+        view = camera.GetViewMatrix();
+        glBufferSubData(GL_UNIFORM_BUFFER, sizeof(glm::mat4), sizeof(glm::mat4), glm::value_ptr(view));
+        glBindBuffer(GL_UNIFORM_BUFFER, 0);
+
         // Rendering
         glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
         glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
         glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
 
-        DrawScene(normalShader, planeVAO, floorTexture, cubeVAO, cubeTexture, singleColorShader, vegetationVAO, transparentTexture, vegetation);
-        // Drawing skybox after objets is more efficient
-        DrawSkybox(skyboxShader, skyboxVAO, cubemapTexture);
+        // Draw
+        glBindVertexArray(cubeVAO);
+        shaderRed.use();
+        model = glm::mat4(1.0f);
+        model = glm::translate(model, redCubePos);
+        shaderRed.setMat4("model", model);
+        glDrawArrays(GL_TRIANGLES, 0, 36);
+        shaderGreen.use();
+        model = glm::mat4(1.0f);
+        model = glm::translate(model, greenCubePos);
+        shaderGreen.setMat4("model", model);
+        glDrawArrays(GL_TRIANGLES, 0, 36);
+        shaderBlue.use();
+        model = glm::mat4(1.0f);
+        model = glm::translate(model, blueCubePos);
+        shaderBlue.setMat4("model", model);
+        glDrawArrays(GL_TRIANGLES, 0, 36);
+        shaderYellow.use();
+        model = glm::mat4(1.0f);
+        model = glm::translate(model, yellowCubePos);
+        shaderYellow.setMat4("model", model);
+        glDrawArrays(GL_TRIANGLES, 0, 36);
+        glBindVertexArray(0);
 
         // Now the window's framebuffer default
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
         glClearColor(0.2f, 0.3f, 0.5f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-        DrawScene(normalShader, planeVAO, floorTexture, cubeVAO, cubeTexture, singleColorShader, vegetationVAO, transparentTexture, vegetation);
-        DrawReflectiveCube(reflectiveContainerShader, containerReflectVAO, cubemapTexture);
-        // backpack.Draw(reflectiveContainerShader);
-        DrawRefractiveCube(refractiveContainerShader, containerReflectVAO, cubemapTexture);
-        // backpack.Draw(refractiveContainerShader);
-        // Drawing skybox after objets is more efficient
-        DrawColoredCube(fragCoordShader, containerReflectVAO);
-        DrawPoints(pointShader, pointsVAO);
-        DrawSkybox(skyboxShader, skyboxVAO, cubemapTexture);
-        screenShader.use();
+        shaderQuad.use();
         glBindVertexArray(quadVAO);
-        glm::mat4 model = glm::mat4(1.0f);
-        model = glm::translate(model, mirrorCenterPos);
-        // glm::mat4 view = glm::lookAt(camera.Position, (-camera.Front) - camera.Position, camera.Up);
-        model = glm::rotate(model, glm::radians(-90.0f), glm::vec3(0.0f, 1.0f, 0.0f));
-        glm::mat4 view = camera.GetViewMatrix();
-        glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
-        screenShader.setMat4("model", model);
-        screenShader.setMat4("view", view);
-        screenShader.setMat4("projection", projection);
         glBindTexture(GL_TEXTURE_2D, textureColorBuffer);
         glDrawArrays(GL_TRIANGLES, 0, 6);
 
@@ -546,220 +576,6 @@ int main()
 
     glfwTerminate();
     return 0;
-}
-
-void DrawReflectiveCube(Shader &reflectiveContainerShader, [[maybe_unused]] unsigned int containerReflectVAO, [[maybe_unused]] unsigned int cubemapTexture)
-{
-    // Drawing reflective container
-    reflectiveContainerShader.use();
-    glm::mat4 model = glm::mat4(1.0f);
-    model = glm::translate(model, glm::vec3(0.0f, 1.5f, 0.0f));
-    // model = glm::rotate(model, glm::radians((float)glfwGetTime() * 20.0f), glm::vec3(0.0f, 1.0f, 0.0f));
-    glm::mat4 view = camera.GetViewMatrix();
-    glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
-    reflectiveContainerShader.setMat4("model", model);
-    reflectiveContainerShader.setMat4("view", view);
-    reflectiveContainerShader.setMat4("projection", projection);
-    reflectiveContainerShader.setVec3("cameraPos", camera.Position);
-    glBindVertexArray(containerReflectVAO);
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_CUBE_MAP, cubemapTexture);
-    glDrawArrays(GL_TRIANGLES, 0, 36);
-    model = glm::translate(model, glm::vec3(0.0f, 3.5f, 0.0f));
-    reflectiveContainerShader.setMat4("model", model);
-}
-
-void DrawRefractiveCube(Shader &refractiveContainerShader, [[maybe_unused]] unsigned int containerRefractVAO, [[maybe_unused]] unsigned int cubemapTexture)
-{
-    // Drawing refractive container
-    refractiveContainerShader.use();
-    glm::mat4 model = glm::mat4(1.0f);
-    model = glm::translate(model, glm::vec3(2.0f, 1.5f, 0.0f));
-    // model = glm::rotate(model, glm::radians((float)glfwGetTime() * 20.0f), glm::vec3(0.0f, 1.0f, 0.0f));
-    glm::mat4 view = camera.GetViewMatrix();
-    glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
-    refractiveContainerShader.setMat4("model", model);
-    refractiveContainerShader.setMat4("view", view);
-    refractiveContainerShader.setMat4("projection", projection);
-    refractiveContainerShader.setVec3("cameraPos", camera.Position);
-    glBindVertexArray(containerRefractVAO);
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_CUBE_MAP, cubemapTexture);
-    glDrawArrays(GL_TRIANGLES, 0, 36);
-    model = glm::translate(model, glm::vec3(2.0f, 3.5f, 0.0f));
-    refractiveContainerShader.setMat4("model", model);
-}
-
-void DrawSkybox(Shader &skyboxShader, unsigned int skyboxVAO, unsigned int cubemapTexture)
-{
-    static bool mirrorPass = true;
-    // skybox
-    // the skybox/cube is near camera, so always pass depth test and write it to depth buffer,
-    // other objects far away will fail so we deactivate depth writing, after finish skyboz drawing we set depth function back to default to render other objects, this way we can avoid the problem of skybox always being in the back of the scene
-    // we draw the other objects that will pass based on proper depht buffer
-    // glDepthMask(GL_FALSE); // this is not the most efficient approach
-    // using vertex shader to force far plane option/ more efficient
-    glDepthFunc(GL_LEQUAL); // change depth function so depth test passes when values are equal to or less than depth buffer's content, this is important for skybox because it will always have depth value of 1.0f, so we want it to pass when depth value is equal to 1.0f, which is the farthest depth value, and other objects will have depth value less than 1.0f, so they will pass the depth test and be rendered in front of the skybox, this way we can avoid the problem of skybox always being in the back of the scene, and also avoid the problem of skybox being rendered on top of other objects when camera is inside the skybox
-    // equal to depth buffer's content
-    skyboxShader.use();
-    glm::mat4 staticView = glm::mat4(1.0f); // remove translation from the view matrix
-    if (mirrorPass)
-    {
-        // camera.Yaw += 180.0f;
-        // camera.ProcessMouseMovement(0, 0, true); // need de-privatize the method
-        // staticView = camera.GetViewMatrix();
-        // // return the camera to original orientation for normal rendering
-        // camera.Yaw -= 180.0f;
-        // camera.ProcessMouseMovement(0, 0, true);       // need de-privatize the method
-        staticView = glm::mat4(glm::mat3(staticView)); // remove translation from the view matrix
-        mirrorPass = false;
-    }
-    else
-    {
-        staticView = glm::mat4(glm::mat3(camera.GetViewMatrix())); // remove translation from the view matrix
-        mirrorPass = true;
-    }
-    // glm::mat4 staticView = camera.GetViewMatrix(); // remove translation from the view matrix
-    glm::mat4 projection_m = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
-    skyboxShader.setMat4("view", staticView);
-    skyboxShader.setMat4("projection", projection_m);
-    glBindVertexArray(skyboxVAO);
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_CUBE_MAP, cubemapTexture);
-    glDrawArrays(GL_TRIANGLES, 0, 36);
-
-    // glDepthMask(GL_TRUE); // set depth function back to default
-    glDepthFunc(GL_LESS); // set depth function back to default, avoid drawing on certain cases
-}
-
-void DrawPoints(Shader &pointShader, unsigned int pointsVAO)
-{
-    pointShader.use();
-    glm::mat4 model = glm::mat4(1.0f);
-    model = glm::translate(model, glm::vec3(0.0f, 4.0f, 0.0f));
-    model = glm::scale(model, glm::vec3(2.0f));
-    glm::mat4 view = camera.GetViewMatrix();
-    glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
-    pointShader.setMat4("model", model);
-    pointShader.setMat4("view", view);
-    pointShader.setMat4("projection", projection);
-    glBindVertexArray(pointsVAO);
-    glDrawArrays(GL_POINTS, 0, 5);
-}
-
-void DrawColoredCube(Shader &fragCoordShader, unsigned int containerReflectVAO)
-{
-    fragCoordShader.use();
-    glm::mat4 model = glm::mat4(1.0f);
-    model = glm::translate(model, glm::vec3(-2.0f, 0.0f, 3.0f));
-    glm::mat4 view = camera.GetViewMatrix();
-    glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
-    fragCoordShader.setMat4("model", model);
-    fragCoordShader.setMat4("view", view);
-    fragCoordShader.setMat4("projection", projection);
-    glBindVertexArray(containerReflectVAO);
-    glDrawArrays(GL_TRIANGLES, 0, 36);
-}
-
-void DrawScene(Shader &normalShader, unsigned int planeVAO, unsigned int floorTexture, unsigned int cubeVAO, unsigned int cubeTexture, Shader &singleColorShader, unsigned int vegetationVAO, unsigned int transparentTexture, std::vector<glm::vec3> &vegetation)
-{
-    static bool mirrorPass = true;
-    // changing over time
-    glm::mat4 trans = glm::mat4(1.0f);
-    // trans = glm::translate(trans, glm::vec3(0.5f, -0.5f, 0.0f));
-    // trans = glm::rotate(trans, (float)glfwGetTime(), glm::vec3(0.0f, 0.0f, 1.0f));
-    glm::mat4 model = glm::mat4(1.0f);
-    glm::mat4 view = mirrorPass
-                         ? glm::lookAt(camera.Position, camera.Position - camera.Front, camera.Up)
-                         : camera.GetViewMatrix();
-    glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
-
-    if (mirrorPass)
-    {
-        glm::vec3 mirrorNormal = glm::vec3(-1.0f, 0.0f, 0.0f);
-        glm::vec3 cameraMirrorPos = mirrorCenterPos + glm::reflect(camera.Position - mirrorCenterPos, mirrorNormal);
-        glm::vec3 cameraMirrorFront = glm::reflect(camera.Front, mirrorNormal); // check
-        // pos target and up
-        view = glm::lookAt(cameraMirrorPos, cameraMirrorPos + cameraMirrorFront, camera.WorldUp);
-        mirrorPass = false;
-    }
-    else
-    {
-        mirrorPass = true;
-    }
-    normalShader.use();
-    normalShader.setMat4("model", model);
-    normalShader.setMat4("view", view);
-    normalShader.setMat4("projection", projection);
-
-    // floor
-    glStencilMask(0x00); // disable writing to the stencil buffer
-    glBindVertexArray(planeVAO);
-    glBindTexture(GL_TEXTURE_2D, floorTexture);
-    normalShader.setMat4("model", glm::mat4(1.0f));
-    glDrawArrays(GL_TRIANGLES, 0, 6);
-    glBindVertexArray(0);
-
-    // cubes
-    glStencilFunc(GL_ALWAYS, 1, 0xFF); // all fragments should pass the stencil test
-    glStencilMask(0xFF);               // enable writing to the stencil buffer
-    glBindVertexArray(cubeVAO);
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, cubeTexture);
-    model = glm::translate(model, glm::vec3(-1.0f, 0.0f, -1.0f));
-    normalShader.setMat4("model", model);
-    glDrawArrays(GL_TRIANGLES, 0, 36);
-    model = glm::mat4(1.0f);
-    model = glm::translate(model, glm::vec3(2.0f, 0.0f, 0.0f));
-    normalShader.setMat4("model", model);
-    glDrawArrays(GL_TRIANGLES, 0, 36);
-
-    // outline
-    glStencilFunc(GL_NOTEQUAL, 1, 0xFF);
-    glStencilMask(0x00);      // disable writing to the stencil buffer
-    glDisable(GL_DEPTH_TEST); // through other objects
-    float scale = 1.05f;
-
-    singleColorShader.use();
-    singleColorShader.setMat4("view", view);
-    singleColorShader.setMat4("projection", projection);
-    model = glm::scale(model, glm::vec3(scale, scale, scale));
-    singleColorShader.setMat4("model", model);
-    glBindVertexArray(cubeVAO);
-    glDrawArrays(GL_TRIANGLES, 0, 36);
-    // another
-    model = glm::mat4(1.0f);
-    model = glm::translate(model, glm::vec3(-1.0f, 0.0f, -1.0f));
-    model = glm::scale(model, glm::vec3(scale, scale, scale));
-    singleColorShader.setMat4("model", model);
-    glDrawArrays(GL_TRIANGLES, 0, 36);
-
-    // if we dont put this line glclear dont work
-    glStencilMask(0xFF);               // enable writing to the stencil buffer without this outline will disappear when the cubes are drawn again in the next frame
-    glStencilFunc(GL_ALWAYS, 1, 0xFF); // again to default, just for safety // erase it dont afefct because plane dont write the buffer
-    glEnable(GL_DEPTH_TEST);
-
-    normalShader.use();
-    glBindVertexArray(vegetationVAO);
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, transparentTexture);
-    // sort
-    std::map<float, glm::vec3> sorted;
-    for (unsigned int i = 0; i < vegetation.size(); i++)
-    {
-        float distance = glm::length(camera.Position - vegetation[i]);
-        sorted[distance] = vegetation[i];
-    }
-    // render
-    glDisable(GL_CULL_FACE); // disable backface culling for transparent objects
-    for (auto it = sorted.rbegin(); it != sorted.rend(); ++it)
-    {
-        model = glm::mat4(1.0f);
-        model = glm::translate(model, it->second);
-        normalShader.setMat4("model", model);
-        glDrawArrays(GL_TRIANGLES, 0, 6);
-    }
-    glEnable(GL_CULL_FACE);
 }
 
 void framebuffer_size_callback([[maybe_unused]] GLFWwindow *window, int width, int height)
