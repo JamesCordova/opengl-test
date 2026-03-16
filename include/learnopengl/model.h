@@ -15,15 +15,16 @@ unsigned int TextureFromFile(const char *path, const std::string &directory);
 class Model
 {
 public:
+    std::vector<Mesh> meshes;
+    // stores all the textures loaded so far, optimization to make sure textures aren't loaded more than once.
+    std::vector<Texture> textures_loaded;
+
     Model(char *path);
     void Draw(Shader &shader);
 
 private:
     // model data
-    std::vector<Mesh> meshes;
     std::string directory;
-    // stores all the textures loaded so far, optimization to make sure textures aren't loaded more than once.
-    std::vector<Texture> textures_loaded;
 
     void loadModel(std::string path);
     void processNode(aiNode *node, const aiScene *scene);
