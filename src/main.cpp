@@ -340,7 +340,7 @@ int main()
     Shader shaderQuad("assets/shaders/framebuffersSimpleQuad.vert", "assets/shaders/framebuffersSimpleQuad.frag");
     Shader shaderUsingGeom("assets/shaders/geometryShaderExplode.vert", "assets/shaders/geometryShaderExplode.frag", "assets/shaders/geometryShaderExplode.geom");
     Shader shaderJustNormals("assets/shaders/geometryShaderNormals.vert", "assets/shaders/geometryShaderNormals.frag", "assets/shaders/geometryShaderNormals.geom");
-    Shader shaderInstancingQuad("assets/shaders/instancingQuad.vert", "assets/shaders/instancingQuad.frag");
+    Shader shaderInstancingArrays("assets/shaders/instancingArrays.vert", "assets/shaders/instancingArrays.frag");
 
     // Set shader programs use the same values
     unsigned int uniformBlockIndexRed = glGetUniformBlockIndex(shaderRed.ID, "Matrices");
@@ -558,11 +558,22 @@ int main()
             translation[index++] = pos;
         }
     }
-    shaderInstancingQuad.use();
-    for (unsigned int i = 0; i < 100; i++)
-    {
-        shaderInstancingQuad.setVec2("offsets[" + std::to_string(i) + "]", translation[i]);
-    }
+    // shaderInstancingQuad.use();
+    // for (unsigned int i = 0; i < 100; i++)
+    // {
+    //     shaderInstancingQuad.setVec2("offsets[" + std::to_string(i) + "]", translation[i]);
+    // }
+    unsigned int offsetVBO;
+    glGenBuffers(1, &offsetVBO);
+    glBindBuffer(GL_ARRAY_BUFFER, offsetVBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(glm::vec2) * 100, translation, GL_STATIC_DRAW);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    glBindVertexArray(instancingQuadVAO);
+    glEnableVertexAttribArray(2);
+    glBindBuffer(GL_ARRAY_BUFFER, offsetVBO);
+    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void *)0);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    glVertexAttribDivisor(2, 0);
 
     while (!glfwWindowShouldClose(window))
     {
@@ -621,7 +632,7 @@ int main()
         backpackModel.Draw(shaderJustNormals);
 
         // quads
-        shaderInstancingQuad.use();
+        shaderInstancingArrays.use();
         glBindVertexArray(instancingQuadVAO);
         glDrawArraysInstanced(GL_TRIANGLES, 0, 6, 100);
 
