@@ -77,11 +77,11 @@ bool wireframeEnabled = false;
 // Temporary variables needed
 // animation
 float rotationSpeed = 50.0f; // degrees per second
-glm::vec3 mirrorCenterPos(2.5f, 0.5f, -1.5f);
+glm::vec3 mirrorCenterPos(0.0f, 0.5f, -4.5f);
 glm::vec3 cubeColor(1.0f, 0.5f, 0.31f);
 // light things
 glm::vec3 lightPos(1.2f, 1.0f, 2.0f);
-glm::vec3 lightDirection(-0.2f, -1.0f, -0.3f);
+glm::vec3 lightDirection(-0.5f, -0.2f, -0.3f);
 float lightConstant = 1.0f;
 float lightLinear = 0.09f;
 float lightQuadratic = 0.032f;
@@ -127,125 +127,6 @@ int main()
 
     // Imgui setup
     imgui_frame_init(window);
-
-    // data for all the vertices
-
-    float cubeVertices[] = {
-        // positions          // texture Coords
-        -0.5f, -0.5f, -0.5f, 0.0f, 0.0f,
-        0.5f, 0.5f, -0.5f, 1.0f, 1.0f,
-        0.5f, -0.5f, -0.5f, 1.0f, 0.0f,
-        -0.5f, 0.5f, -0.5f, 0.0f, 1.0f,
-        0.5f, 0.5f, -0.5f, 1.0f, 1.0f,
-        -0.5f, -0.5f, -0.5f, 0.0f, 0.0f, // back face
-
-        -0.5f, -0.5f, 0.5f, 0.0f, 0.0f,
-        0.5f, -0.5f, 0.5f, 1.0f, 0.0f,
-        0.5f, 0.5f, 0.5f, 1.0f, 1.0f,
-        0.5f, 0.5f, 0.5f, 1.0f, 1.0f,
-        -0.5f, 0.5f, 0.5f, 0.0f, 1.0f,
-        -0.5f, -0.5f, 0.5f, 0.0f, 0.0f, // front face
-
-        -0.5f, 0.5f, 0.5f, 1.0f, 0.0f,
-        -0.5f, 0.5f, -0.5f, 1.0f, 1.0f,
-        -0.5f, -0.5f, -0.5f, 0.0f, 1.0f,
-        -0.5f, -0.5f, -0.5f, 0.0f, 1.0f,
-        -0.5f, -0.5f, 0.5f, 0.0f, 0.0f,
-        -0.5f, 0.5f, 0.5f, 1.0f, 0.0f, // left face
-
-        0.5f, 0.5f, 0.5f, 1.0f, 0.0f,
-        0.5f, -0.5f, -0.5f, 0.0f, 1.0f,
-        0.5f, 0.5f, -0.5f, 1.0f, 1.0f,
-        0.5f, -0.5f, 0.5f, 0.0f, 0.0f,
-        0.5f, -0.5f, -0.5f, 0.0f, 1.0f,
-        0.5f, 0.5f, 0.5f, 1.0f, 0.0f, // right face
-
-        -0.5f, -0.5f, -0.5f, 0.0f, 1.0f,
-        0.5f, -0.5f, -0.5f, 1.0f, 1.0f,
-        0.5f, -0.5f, 0.5f, 1.0f, 0.0f,
-        0.5f, -0.5f, 0.5f, 1.0f, 0.0f,
-        -0.5f, -0.5f, 0.5f, 0.0f, 0.0f,
-        -0.5f, -0.5f, -0.5f, 0.0f, 1.0f, // bottom face
-
-        -0.5f, 0.5f, -0.5f, 0.0f, 1.0f,
-        0.5f, 0.5f, 0.5f, 1.0f, 0.0f,
-        0.5f, 0.5f, -0.5f, 1.0f, 1.0f,
-        -0.5f, 0.5f, 0.5f, 0.0f, 0.0f,
-        0.5f, 0.5f, 0.5f, 1.0f, 0.0f,
-        -0.5f, 0.5f, -0.5f, 0.0f, 1.0f // top face
-    };
-
-    float containerReflectiveVertices[] = {
-        // positions         // normals
-        -0.5f, -0.5f, -0.5f, 0.0f, 0.0f, -1.0f,
-        0.5f, 0.5f, -0.5f, 0.0f, 0.0f, -1.0f,
-        0.5f, -0.5f, -0.5f, 0.0f, 0.0f, -1.0f,
-        -0.5f, 0.5f, -0.5f, 0.0f, 0.0f, -1.0f,
-        0.5f, 0.5f, -0.5f, 0.0f, 0.0f, -1.0f,
-        -0.5f, -0.5f, -0.5f, 0.0f, 0.0f, -1.0f, // back face
-
-        -0.5f, -0.5f, 0.5f, 0.0f, 0.0f, 1.0f,
-        0.5f, -0.5f, 0.5f, 0.0f, 0.0f, 1.0f,
-        0.5f, 0.5f, 0.5f, 0.0f, 0.0f, 1.0f,
-        0.5f, 0.5f, 0.5f, 0.0f, 0.0f, 1.0f,
-        -0.5f, 0.5f, 0.5f, 0.0f, 0.0f, 1.0f,
-        -0.5f, -0.5f, 0.5f, 0.0f, 0.0f, 1.0f, // front face
-
-        -0.5f, 0.5f, 0.5f, -1.0f, 0.0f, 0.0f,
-        -0.5f, 0.5f, -0.5f, -1.0f, 0.0f, 0.0f,
-        -0.5f, -0.5f, -0.5f, -1.0f, 0.0f, 0.0f,
-        -0.5f, -0.5f, -0.5f, -1.0f, 0.0f, 0.0f,
-        -0.5f, -0.5f, 0.5f, -1.0f, 0.0f, 0.0f,
-        -0.5f, 0.5f, 0.5f, -1.0f, 0.0f, 0.0f, // left face
-
-        0.5f, 0.5f, 0.5f, 1.0f, 0.0f, 0.0f,
-        0.5f, -0.5f, -0.5f, 1.0f, 0.0f, 0.0f,
-        0.5f, 0.5f, -0.5f, 1.0f, 0.0f, 0.0f,
-        0.5f, -0.5f, 0.5f, 1.0f, 0.0f, 0.0f,
-        0.5f, -0.5f, -0.5f, 1.0f, 0.0f, 0.0f,
-        0.5f, 0.5f, 0.5f, 1.0f, 0.0f, 0.0f, // right face
-
-        -0.5f, -0.5f, -0.5f, 0.0f, -1.0f, 0.0f,
-        0.5f, -0.5f, -0.5f, 0.0f, -1.0f, 0.0f,
-        0.5f, -0.5f, 0.5f, 0.0f, -1.0f, 0.0f,
-        0.5f, -0.5f, 0.5f, 0.0f, -1.0f, 0.0f,
-        -0.5f, -0.5f, 0.5f, 0.0f, -1.0f, 0.0f,
-        -0.5f, -0.5f, -0.5f, 0.0f, -1.0f, 0.0f, // bottom face
-
-        -0.5f, 0.5f, -0.5f, 0.0f, 1.0f, 0.0f,
-        0.5f, 0.5f, 0.5f, 0.0f, 1.0f, 0.0f,
-        0.5f, 0.5f, -0.5f, 0.0f, 1.0f, 0.0f,
-        -0.5f, 0.5f, 0.5f, 0.0f, 1.0f, 0.0f,
-        0.5f, 0.5f, 0.5f, 0.0f, 1.0f, 0.0f,
-        -0.5f, 0.5f, -0.5f, 0.0f, 1.0f, 0.0f // top face
-    };
-
-    float planeVertices[] = {
-        // positions          // texture Coords (note we set these higher than 1 (together with GL_REPEAT as texture wrapping mode). this will cause the floor texture to repeat)
-        5.0f, -0.5f, 5.0f, 2.0f, 0.0f,
-        -5.0f, -0.5f, -5.0f, 0.0f, 2.0f,
-        -5.0f, -0.5f, 5.0f, 0.0f, 0.0f,
-
-        5.0f, -0.5f, 5.0f, 2.0f, 0.0f,
-        5.0f, -0.5f, -5.0f, 2.0f, 2.0f,
-        -5.0f, -0.5f, -5.0f, 0.0f, 2.0f};
-
-    float transparentVertices[] = {
-        // positions         // texture Coords (swapped y coordinates because texture is flipped upside down)
-        0.0f, 0.5f, 0.0f, 0.0f, 0.0f,
-        0.0f, -0.5f, 0.0f, 0.0f, 1.0f,
-        1.0f, -0.5f, 0.0f, 1.0f, 1.0f,
-
-        0.0f, 0.5f, 0.0f, 0.0f, 0.0f,
-        1.0f, -0.5f, 0.0f, 1.0f, 1.0f,
-        1.0f, 0.5f, 0.0f, 1.0f, 0.0f};
-
-    std::vector<glm::vec3> vegetation;
-    vegetation.push_back(glm::vec3(-1.5f, 0.0f, -0.48f));
-    vegetation.push_back(glm::vec3(1.5f, 0.0f, 0.51f));
-    vegetation.push_back(glm::vec3(0.0f, 0.0f, 0.7f));
-    vegetation.push_back(glm::vec3(-0.3f, 0.0f, -2.3f));
-    vegetation.push_back(glm::vec3(0.5f, 0.0f, -0.6f));
 
     float quadVertices[] = {
         // positions   // texCoords
@@ -301,99 +182,27 @@ int main()
         -1.0f, -1.0f, 1.0f,
         1.0f, -1.0f, 1.0f};
 
-    float vertices[] = {
-        0.0f, 0.0f, 0.0f,  // point at center
-        -0.5f, 0.0f, 0.0f, // point left
-        0.5f, 0.0f, 0.0f,  // point right
-        0.0f, 0.5f, 0.0f,  // point top
-        0.0f, -0.5f, 0.0f  // point bottom
-    };
-
-    float geometryPoints[] = {
-        -0.5f, 0.5f, 1.0f, 0.0f, 0.0f, // top-left
-        0.5f, 0.5f, 0.0f, 1.0f, 0.0f,  // top-right
-        0.5f, -0.5f, 0.0f, 0.0f, 1.0f, // bottom-right
-        -0.5f, -0.5f, 1.0f, 1.0f, 0.0f // bottom-left
-    };
-
-    float instancingQuadVertices[] = {
-        // positions     // colors
-        -0.05f, 0.05f, 1.0f, 0.0f, 0.0f,
-        -0.05f, -0.05f, 0.0f, 0.0f, 1.0f,
-        0.05f, -0.05f, 0.0f, 1.0f, 0.0f,
-
-        -0.05f, 0.05f, 1.0f, 0.0f, 0.0f,
-        0.05f, -0.05f, 0.0f, 1.0f, 0.0f,
-        0.05f, 0.05f, 0.0f, 1.0f, 1.0f // 
-    };
-
     std::vector<std::string>
         faces = {"assets/textures/skybox/right.jpg", "assets/textures/skybox/left.jpg", "assets/textures/skybox/top.jpg", "assets/textures/skybox/bottom.jpg", "assets/textures/skybox/front.jpg", "assets/textures/skybox/back.jpg"};
     // Models
     stbi_set_flip_vertically_on_load(true);
-    Model backpackModel("assets/objects/backpack/backpack.obj");
+    Model planetModel("assets/objects/planet/planet.obj");
+    Model rockModel("assets/objects/rock/rock.obj");
     // Implementation
-    Shader shaderRed("assets/shaders/advancedGLSLRed.vert", "assets/shaders/advancedGLSLRed.frag");
-    Shader shaderGreen("assets/shaders/advancedGLSLGreen.vert", "assets/shaders/advancedGLSLGreen.frag");
-    Shader shaderBlue("assets/shaders/advancedGLSLBlue.vert", "assets/shaders/advancedGLSLBlue.frag");
-    Shader shaderYellow("assets/shaders/advancedGLSLYellow.vert", "assets/shaders/advancedGLSLYellow.frag");
     Shader shaderQuad("assets/shaders/framebuffersSimpleQuad.vert", "assets/shaders/framebuffersSimpleQuad.frag");
-    Shader shaderUsingGeom("assets/shaders/geometryShaderExplode.vert", "assets/shaders/geometryShaderExplode.frag", "assets/shaders/geometryShaderExplode.geom");
     Shader shaderJustNormals("assets/shaders/geometryShaderNormals.vert", "assets/shaders/geometryShaderNormals.frag", "assets/shaders/geometryShaderNormals.geom");
     Shader shaderInstancingArrays("assets/shaders/instancingArrays.vert", "assets/shaders/instancingArrays.frag");
-
+    Shader shaderPlanet("assets/shaders/instancingPlanet.vert", "assets/shaders/instancingPlanet.frag");
+    Shader shaderInstancingRocks("assets/shaders/instancingRealRocks.vert", "assets/shaders/instancingRealRocks.frag");
     // Set shader programs use the same values
-    unsigned int uniformBlockIndexRed = glGetUniformBlockIndex(shaderRed.ID, "Matrices");
-    unsigned int uniformBlockIndexGreen = glGetUniformBlockIndex(shaderGreen.ID, "Matrices");
-    unsigned int uniformBlockIndexBlue = glGetUniformBlockIndex(shaderBlue.ID, "Matrices");
-    unsigned int uniformBlockIndexYellow = glGetUniformBlockIndex(shaderYellow.ID, "Matrices");
-    unsigned int uniformBlockIndexUsingGeom = glGetUniformBlockIndex(shaderUsingGeom.ID, "Matrices");
     unsigned int uniformBlockIndexJustNormals = glGetUniformBlockIndex(shaderJustNormals.ID, "Matrices");
+    unsigned int uniformBlockIndexPlanet = glGetUniformBlockIndex(shaderPlanet.ID, "Matrices");
+    unsigned int uniformBlockIndexInstancingRocks = glGetUniformBlockIndex(shaderInstancingRocks.ID, "Matrices");
 
-    glUniformBlockBinding(shaderRed.ID, uniformBlockIndexRed, 0);
-    glUniformBlockBinding(shaderGreen.ID, uniformBlockIndexGreen, 0);
-    glUniformBlockBinding(shaderBlue.ID, uniformBlockIndexBlue, 0);
-    glUniformBlockBinding(shaderYellow.ID, uniformBlockIndexYellow, 0);
-    glUniformBlockBinding(shaderUsingGeom.ID, uniformBlockIndexUsingGeom, 0);
     glUniformBlockBinding(shaderJustNormals.ID, uniformBlockIndexJustNormals, 0);
-
-    // cubeVAO
-    unsigned int cubeVAO, cubeVBO;
-    glGenVertexArrays(1, &cubeVAO);
-    glGenBuffers(1, &cubeVBO);
-    glBindVertexArray(cubeVAO);
-    glBindBuffer(GL_ARRAY_BUFFER, cubeVBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(cubeVertices), &cubeVertices, GL_STATIC_DRAW);
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void *)0);
-    glEnableVertexAttribArray(1);
-    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void *)(3 * sizeof(float)));
-    glBindVertexArray(0);
-    // plane VAO
-    unsigned int planeVAO, planeVBO;
-    glGenVertexArrays(1, &planeVAO);
-    glGenBuffers(1, &planeVBO);
-    glBindVertexArray(planeVAO);
-    glBindBuffer(GL_ARRAY_BUFFER, planeVBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(planeVertices), &planeVertices, GL_STATIC_DRAW);
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void *)0);
-    glEnableVertexAttribArray(1);
-    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void *)(3 * sizeof(float)));
-    glBindVertexArray(0);
-    // vegetation VAO
-    unsigned int vegetationVAO, vegetationVBO;
-    glGenVertexArrays(1, &vegetationVAO);
-    glGenBuffers(1, &vegetationVBO);
-    glBindVertexArray(vegetationVAO);
-    glBindBuffer(GL_ARRAY_BUFFER, vegetationVBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(transparentVertices), &transparentVertices, GL_STATIC_DRAW);
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void *)0);
-    glEnableVertexAttribArray(1);
-    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void *)(3 * sizeof(float)));
-    glBindVertexArray(0);
-    // quad VAO
+    glUniformBlockBinding(shaderPlanet.ID, uniformBlockIndexPlanet, 0);
+    glUniformBlockBinding(shaderInstancingRocks.ID, uniformBlockIndexInstancingRocks, 0);
+    // quadVAO
     unsigned int quadVAO, quadVBO;
     glGenVertexArrays(1, &quadVAO);
     glGenBuffers(1, &quadVBO);
@@ -415,52 +224,6 @@ int main()
     glEnableVertexAttribArray(0);
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void *)0);
     glBindVertexArray(0);
-    // Reflective container VAO
-    unsigned int containerReflectVAO, containerReflectVBO;
-    glGenVertexArrays(1, &containerReflectVAO);
-    glGenBuffers(1, &containerReflectVBO);
-    glBindVertexArray(containerReflectVAO);
-    glBindBuffer(GL_ARRAY_BUFFER, containerReflectVBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(containerReflectiveVertices), &containerReflectiveVertices, GL_STATIC_DRAW);
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void *)0);
-    glEnableVertexAttribArray(1);
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void *)(3 * sizeof(float)));
-    glBindVertexArray(0);
-    // points VAO VBO
-    unsigned int pointsVAO, pointsVBO;
-    glGenVertexArrays(1, &pointsVAO);
-    glGenBuffers(1, &pointsVBO);
-    glBindVertexArray(pointsVAO);
-    glBindBuffer(GL_ARRAY_BUFFER, pointsVBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), &vertices, GL_STATIC_DRAW);
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void *)0);
-    glBindVertexArray(0);
-    // geometry points VAO, VBO
-    unsigned int geometryPointsVAO, geometryPointsVBO;
-    glGenVertexArrays(1, &geometryPointsVAO);
-    glGenBuffers(1, &geometryPointsVBO);
-    glBindVertexArray(geometryPointsVAO);
-    glBindBuffer(GL_ARRAY_BUFFER, geometryPointsVBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(geometryPoints), &geometryPoints, GL_STATIC_DRAW);
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void *)0);
-    glEnableVertexAttribArray(1);
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void *)(2 * sizeof(float)));
-    glBindVertexArray(0);
-    // instancing quad VAO, VBO
-    unsigned int instancingQuadVAO, instancingQuadVBO;
-    glGenVertexArrays(1, &instancingQuadVAO);
-    glGenBuffers(1, &instancingQuadVBO);
-    glBindVertexArray(instancingQuadVAO);
-    glBindBuffer(GL_ARRAY_BUFFER, instancingQuadVBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(instancingQuadVertices), &instancingQuadVertices, GL_STATIC_DRAW);
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void *)0);
-    glEnableVertexAttribArray(1);
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void *)(2 * sizeof(float)));
-    glBindVertexArray(0);
     // UBO's
     unsigned int uboMatrices;
     glGenBuffers(1, &uboMatrices);
@@ -470,10 +233,6 @@ int main()
     glBindBuffer(GL_UNIFORM_BUFFER, 0);
 
     glBindBufferRange(GL_UNIFORM_BUFFER, 0, uboMatrices, 0, 2 * sizeof(glm::mat4));
-
-    // Load Textures
-    // stbi_set_flip_vertically_on_load(true);
-    // unsigned int cubeTexture = loadTexture("assets/textures/marble.jpg");
 
     // framebuffers
     unsigned int framebuffer;
@@ -535,52 +294,84 @@ int main()
     glfwShowWindow(window);
     glfwSetCursorPos(window, SCR_WIDTH / 2.0, SCR_HEIGHT / 2.0);
 
+    // model default
+    glm::mat4 model = glm::mat4(1.0f);
+
     // now view
     glm::mat4 view = camera.GetViewMatrix();
     glBufferSubData(GL_UNIFORM_BUFFER, sizeof(glm::mat4), sizeof(glm::mat4), glm::value_ptr(view));
     glBindBuffer(GL_UNIFORM_BUFFER, 0);
-    // defined
-    glm::mat4 model = glm::mat4(1.0f);
-    glm::vec3 redCubePos(-0.75f, 0.75f, 0.0f);
-    glm::vec3 greenCubePos(0.75f, 0.75f, 0.0f);
-    glm::vec3 blueCubePos(-0.75f, -0.75f, 0.0f);
-    glm::vec3 yellowCubePos(0.75f, -0.75f, 0.0f);
-    glm::vec2 translation[100];
-    int index = 0;
-    float offset = 0.1f;
-    for (int y = -10; y < 10; y += 2)
+    // defined positions for instancing
+    unsigned int amount = 1000;
+    glm::mat4 *modelMatrices = new glm::mat4[amount];
+    srand(0);
+    float radius = 15.0f;
+    float offset = 2.5f;
+    for (unsigned int i = 0; i < amount; i++)
     {
-        for (int x = -10; x < 10; x += 2)
-        {
-            glm::vec2 pos;
-            pos.x = static_cast<float>(x) / 10.0f + offset;
-            pos.y = static_cast<float>(y) / 10.0f + offset;
-            translation[index++] = pos;
-        }
+        model = glm::mat4(1.0f);
+        // model = glm::rotate(model, glm::radians(rotationSpeed * static_cast<float>(glfwGetTime())), glm::vec3(0.0f, 1.0f, 0.0f));
+        // 1. translation: displace along circle with 'radius' in range [-offset, offset]
+        float angle = (float)i / (float)amount * 360.0f;
+        float displacement = (rand() % (int)(2 * offset * 100)) / 100.0f - offset;
+        float x = sin(angle) * radius + displacement;
+        float y = displacement * 0.4f; // keep height of field smaller compared to width of x and z
+        displacement = (rand() % (int)(2 * offset * 100)) / 100.0f - offset;
+        float z = cos(angle) * radius + displacement;
+        model = glm::translate(model, glm::vec3(x, y, z));
+        model = glm::translate(model, mirrorCenterPos); // translate to center of planet
+
+        // 2. scale: Scale between 0.05 and 0.25f
+        float scale = (rand() % 20) / 100.0f + 0.05f;
+        model = glm::scale(model, glm::vec3(scale));
+
+        // 3. rotation: add random rotation around a (semi)randomly picked rotation axis vector
+        float rotAngle = static_cast<float>(rand() % 360);
+        model = glm::rotate(model, glm::radians(rotAngle), glm::vec3(0.4f, 0.6f, 0.8f));
+
+        // 4. now add to list of matrices
+        modelMatrices[i] = model;
     }
-    // shaderInstancingQuad.use();
-    // for (unsigned int i = 0; i < 100; i++)
-    // {
-    //     shaderInstancingQuad.setVec2("offsets[" + std::to_string(i) + "]", translation[i]);
-    // }
-    unsigned int offsetVBO;
-    glGenBuffers(1, &offsetVBO);
-    glBindBuffer(GL_ARRAY_BUFFER, offsetVBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(glm::vec2) * 100, translation, GL_STATIC_DRAW);
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
-    glBindVertexArray(instancingQuadVAO);
-    glEnableVertexAttribArray(2);
-    glBindBuffer(GL_ARRAY_BUFFER, offsetVBO);
-    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void *)0);
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
-    glVertexAttribDivisor(2, 1);
+
+    // buffer for instancing
+    unsigned int modelsByRockVBO;
+    glGenBuffers(1, &modelsByRockVBO);
+    glBindBuffer(GL_ARRAY_BUFFER, modelsByRockVBO);
+    glBufferData(GL_ARRAY_BUFFER, amount * sizeof(glm::mat4), &modelMatrices[0], GL_STATIC_DRAW);
+    // glBindBuffer(GL_ARRAY_BUFFER, 0); We need the data for the vertex attribute pointers, dont unbind
+    // glEnableVertexAttribArray(3);
+    // glVertexAttribPointer(3, )
+    for (unsigned int i = 0; i < rockModel.meshes.size(); i++)
+    {
+        unsigned int VAO = rockModel.meshes[i].VAO;
+        glBindVertexArray(VAO);
+        // glBindBuffer(GL_ARRAY_BUFFER, modelsByRockVBO); // bind it if was unbinded it
+        // set attribute pointers for matrix (4 times vec4)
+        std::size_t vec4Size = sizeof(glm::vec4);
+        glEnableVertexAttribArray(3);
+        glVertexAttribPointer(3, 4, GL_FLOAT, GL_FALSE, 4 * static_cast<GLsizei>(vec4Size), (void *)0);
+        glEnableVertexAttribArray(4);
+        glVertexAttribPointer(4, 4, GL_FLOAT, GL_FALSE, 4 * static_cast<GLsizei>(vec4Size), (void *)(1 * vec4Size));
+        glEnableVertexAttribArray(5);
+        glVertexAttribPointer(5, 4, GL_FLOAT, GL_FALSE, 4 * static_cast<GLsizei>(vec4Size), (void *)(2 * vec4Size));
+        glEnableVertexAttribArray(6);
+        glVertexAttribPointer(6, 4, GL_FLOAT, GL_FALSE, 4 * static_cast<GLsizei>(vec4Size), (void *)(3 * vec4Size));
+
+        glVertexAttribDivisor(3, 1);
+        glVertexAttribDivisor(4, 1);
+        glVertexAttribDivisor(5, 1);
+        glVertexAttribDivisor(6, 1);
+
+        glBindVertexArray(0);
+    }
+
+    // setting uniforms that won't change in the render loop
+    glBindBuffer(GL_UNIFORM_BUFFER, uboMatrices);
+    glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
+    glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(glm::mat4), glm::value_ptr(projection));
 
     while (!glfwWindowShouldClose(window))
     {
-        // setting uniforms that won't change in the render loop
-        glBindBuffer(GL_UNIFORM_BUFFER, uboMatrices);
-        glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
-        glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(glm::mat4), glm::value_ptr(projection));
         processInput(window);
         calculateDeltaTime();
         // FPS counter
@@ -599,42 +390,43 @@ int main()
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
 
         // Draw
-        // glBindVertexArray(cubeVAO);
-        // shaderRed.use();
-        // model = glm::mat4(1.0f);
-        // model = glm::translate(model, redCubePos);
-        // shaderRed.setMat4("model", model);
-        // glDrawArrays(GL_TRIANGLES, 0, 36);
-        // shaderGreen.use();
-        // model = glm::mat4(1.0f);
-        // model = glm::translate(model, greenCubePos);
-        // shaderGreen.setMat4("model", model);
-        // glDrawArrays(GL_TRIANGLES, 0, 36);
-        // shaderBlue.use();
-        // model = glm::mat4(1.0f);
-        // model = glm::translate(model, blueCubePos);
-        // shaderBlue.setMat4("model", model);
-        // glDrawArrays(GL_TRIANGLES, 0, 36);
-        // shaderYellow.use();
-        // model = glm::mat4(1.0f);
-        // model = glm::translate(model, yellowCubePos);
-        // shaderYellow.setMat4("model", model);
-        // glDrawArrays(GL_TRIANGLES, 0, 36);
-        shaderUsingGeom.use();
         model = glm::mat4(1.0f);
-        shaderUsingGeom.setMat4("model", model);
-        // shaderUsingGeom.setFloat("time", static_cast<float>(glfwGetTime()));
-        // for testing normals, set constant so no position change
-        shaderUsingGeom.setFloat("time", glm::radians(90.0f));
-        backpackModel.Draw(shaderUsingGeom);
-        shaderJustNormals.use();
-        shaderJustNormals.setMat4("model", model);
-        backpackModel.Draw(shaderJustNormals);
-
+        model = glm::translate(model, mirrorCenterPos);
+        model = glm::rotate(model, glm::radians(rotationSpeed * static_cast<float>(glfwGetTime())), glm::vec3(0.0f, 1.0f, 0.0f));
+        shaderPlanet.use();
+        shaderPlanet.setMat4("model", model);
+        // material
+        shaderPlanet.setFloat("material.shininess", 8.0f);
+        // directional light
+        glm::vec3 lightAmbient = glm::vec3(0.05f, 0.05f, 0.05f);
+        glm::vec3 lightDiffuse = glm::vec3(0.9f, 0.9f, 0.9f);
+        glm::vec3 lightSpecular = glm::vec3(0.5f, 0.5f, 0.5f);
+        shaderPlanet.setVec3("directionalLight.direction", lightDirection);
+        shaderPlanet.setVec3("directionalLight.ambient", lightAmbient);
+        shaderPlanet.setVec3("directionalLight.diffuse", lightDiffuse);
+        shaderPlanet.setVec3("directionalLight.specular", lightSpecular);
+        // draw planet
+        planetModel.Draw(shaderPlanet);
+        // draw rocks
+        shaderInstancingRocks.use();
+        shaderInstancingRocks.setMat4("model", model);
+        // material
+        shaderInstancingRocks.setFloat("material.shininess", 16.0f);
+        // directional light
+        shaderInstancingRocks.setVec3("directionalLight.direction", lightDirection);
+        shaderInstancingRocks.setVec3("directionalLight.ambient", lightAmbient);
+        shaderInstancingRocks.setVec3("directionalLight.diffuse", lightDiffuse);
+        shaderInstancingRocks.setVec3("directionalLight.specular", lightSpecular);
+        shaderInstancingRocks.setInt("texture_diffuse1", 0);
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, rockModel.textures_loaded[0].id);
+        for (unsigned int i = 0; i < rockModel.meshes.size(); i++)
+        {
+            glBindVertexArray(rockModel.meshes[i].VAO);
+            glDrawElementsInstanced(GL_TRIANGLES, static_cast<GLsizei>(rockModel.meshes[i].indices.size()), GL_UNSIGNED_INT, 0, amount);
+        }
+        // rockModel.Draw(shaderInstancingRocks);
         // quads
-        shaderInstancingArrays.use();
-        glBindVertexArray(instancingQuadVAO);
-        glDrawArraysInstanced(GL_TRIANGLES, 0, 6, 100);
 
         // Now the window's framebuffer default
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
