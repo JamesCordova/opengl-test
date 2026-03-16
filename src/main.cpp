@@ -79,6 +79,7 @@ bool wireframeEnabled = false;
 float rotationSpeed = 50.0f; // degrees per second
 glm::vec3 mirrorCenterPos(0.0f, 0.5f, -4.5f);
 glm::vec3 cubeColor(1.0f, 0.5f, 0.31f);
+glm::vec3 framebufferColor(0.2f, 0.3f, 0.3f);
 // light things
 glm::vec3 lightPos(1.2f, 1.0f, 2.0f);
 glm::vec3 lightDirection(-0.5f, -0.2f, -0.3f);
@@ -98,6 +99,7 @@ int main()
 
     glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, true);
     glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
+    glfwWindowHint(GLFW_SAMPLES, 8);
 
     GLFWwindow *window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "LearnOpenGL", NULL, NULL);
     if (window == NULL)
@@ -235,34 +237,36 @@ int main()
     glBindBufferRange(GL_UNIFORM_BUFFER, 0, uboMatrices, 0, 2 * sizeof(glm::mat4));
 
     // framebuffers
-    unsigned int framebuffer;
-    glGenFramebuffers(1, &framebuffer);
-    glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
+    unsigned int framebufferMSSA;
+    glGenFramebuffers(1, &framebufferMSSA);
+    glBindFramebuffer(GL_FRAMEBUFFER, framebufferMSSA);
 
     // Attach a color buffer texture to the framebuffer's color attachment point
-    unsigned int textureColorBuffer;
-    glGenTextures(1, &textureColorBuffer);
-    glBindTexture(GL_TEXTURE_2D, textureColorBuffer);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, SCR_WIDTH, SCR_HEIGHT, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
+    unsigned int textureColorBufferMSSA;
+    glGenTextures(1, &textureColorBufferMSSA);
+    glBindTexture(GL_TEXTURE_2D_MULTISAMPLE, textureColorBufferMSSA);
+    int samples = 4; // Number of samples for multisampling
+    glTexImage2DMultisample(GL_TEXTURE_2D_MULTISAMPLE, samples, GL_RGB, SCR_WIDTH, SCR_HEIGHT, GL_TRUE);
 
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    // Dont use
+    // glTexParameteri(GL_TEXTURE_2D_MULTISAMPLE, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    // glTexParameteri(GL_TEXTURE_2D_MULTISAMPLE, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
-    glBindTexture(GL_TEXTURE_2D, 0);
+    glBindTexture(GL_TEXTURE_2D_MULTISAMPLE, 0);
 
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, textureColorBuffer, 0);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D_MULTISAMPLE, textureColorBufferMSSA, 0);
 
     // buffer for depth and stencil attachment // obviusly using texture this approach is for sampling data from depth and stencil buffer, if we dont need to sample we can use renderbuffer which is faster
     // glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH24_STENCIL8, SCR_WIDTH, SCR_HEIGHT, 0, GL_DEPTH_STENCIL, GL_UNSIGNED_INT_24_8, NULL);
 
-    // glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_TEXTURE_2D, textureColorBuffer, 0);
+    // glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_TEXTURE_2D, textureColorBufferMSSA, 0);
 
     // attachments
     // renderbuffer object for depth and stencil attachment (we won't be sampling these)
     unsigned int rbo;
     glGenRenderbuffers(1, &rbo);
     glBindRenderbuffer(GL_RENDERBUFFER, rbo);
-    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, SCR_WIDTH, SCR_HEIGHT);
+    glRenderbufferStorageMultisample(GL_RENDERBUFFER, 4, GL_DEPTH24_STENCIL8, SCR_WIDTH, SCR_HEIGHT);
 
     glBindRenderbuffer(GL_RENDERBUFFER, 0);
 
@@ -270,9 +274,26 @@ int main()
     if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
         std::cout << "ERROR::FRAMEBUFFER:: Framebuffer is not complete!" << std::endl;
 
-    // glDeleteFramebuffers(1, &framebuffer);
+    // glDeleteFramebuffers(1, &framebufferMSSA);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    
+    // THe intemediate framebuffer for resolving multisampled framebuffer
+    unsigned int intermediateFBO;
+    glGenFramebuffers(1, &intermediateFBO);
+    glBindFramebuffer(GL_FRAMEBUFFER, intermediateFBO);
+    unsigned int screenTexture;
+    glGenTextures(1, &screenTexture);
+    glBindTexture(GL_TEXTURE_2D, screenTexture);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, SCR_WIDTH, SCR_HEIGHT, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
+    
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, screenTexture, 0);
+
+    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+        std::cout << "ERROR::FRAMEBUFFER:: Intermediate framebuffer is not complete!" << std::endl;
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
     // finish
     // Configure global opengl state
     glEnable(GL_DEPTH_TEST);
@@ -286,6 +307,7 @@ int main()
     glEnable(GL_CULL_FACE);
     // glCullFace(GL_FRONT);
     glEnable(GL_PROGRAM_POINT_SIZE);
+    glEnable(GL_MULTISAMPLE);
 
     // mouse input, set cursor to center of screen
     glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
@@ -384,9 +406,9 @@ int main()
         glBindBuffer(GL_UNIFORM_BUFFER, 0);
 
         // Rendering
-        glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
+        glBindFramebuffer(GL_FRAMEBUFFER, framebufferMSSA);
         glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
-        glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
+        glClearColor(framebufferColor.r, framebufferColor.g, framebufferColor.b, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
 
         // Draw
@@ -428,16 +450,21 @@ int main()
         // rockModel.Draw(shaderInstancingRocks);
         // quads
 
+        // Blit framebuffer first
+        glBindFramebuffer(GL_READ_FRAMEBUFFER, framebufferMSSA);
+        glBindFramebuffer(GL_DRAW_FRAMEBUFFER, intermediateFBO);
+        glBlitFramebuffer(0, 0, SCR_WIDTH, SCR_HEIGHT, 0, 0, SCR_WIDTH, SCR_HEIGHT, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+
         // Now the window's framebuffer default
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
-        glClearColor(0.2f, 0.3f, 0.5f, 1.0f);
+        glClearColor(framebufferColor.r, framebufferColor.g, framebufferColor.b, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         // by default
         // force to not show the quad in wireframe
         glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
         shaderQuad.use();
         glBindVertexArray(quadVAO);
-        glBindTexture(GL_TEXTURE_2D, textureColorBuffer);
+        glBindTexture(GL_TEXTURE_2D, screenTexture);
         glDrawArrays(GL_TRIANGLES, 0, 6);
         // needed to update based on bool
         glPolygonMode(GL_FRONT_AND_BACK, wireframeEnabled ? GL_LINE : GL_FILL);
@@ -644,6 +671,7 @@ void imgui_frame_update()
     ImGui::SliderFloat("Rotation Speed", &rotationSpeed, 0.0f, 360.0f);
     ImGui::SliderFloat("Camera Speed", &camera.MovementSpeed, 0.0f, 250.0f);
     ImGui::SliderFloat("Mouse Sensitivity", &camera.MouseSensitivity, 0.0f, 1.0f);
+    ImGui::ColorEdit3("Framebuffer Color", (float *)&framebufferColor);
     // ImGui::ColorEdit3("Cube Color", (float *)&cubeColor);
     // ImGui::SliderFloat3("Cube position", (float *)&cubePos, -20.0f, 20.0f);
     // // 3 coloredits and 1 slider float
