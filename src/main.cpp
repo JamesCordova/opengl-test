@@ -33,6 +33,7 @@ namespace FileSystem
 }
 
 void framebuffer_size_callback(GLFWwindow *window, int width, int height);
+void updateProjection();
 void DrawScene(Shader &normalShader, unsigned int planeVAO, unsigned int floorTexture, unsigned int cubeVAO, unsigned int cubeTexture, Shader &singleColorShader, unsigned int vegetationVAO, unsigned int transparentTexture, std::vector<glm::vec3> &vegetation);
 void DrawReflectiveCube(Shader &reflectiveContainerShader, unsigned int containerReflectVAO, unsigned int cubemapTexture);
 void DrawRefractiveCube(Shader &refractiveContainerShader, unsigned int containerRefractVAO, unsigned int cubemapTexture);
@@ -56,14 +57,14 @@ void imgui_frame_render();
 void imgui_frame_shutdown();
 
 // settings
-unsigned int SCR_WIDTH = 800;
-unsigned int SCR_HEIGHT = 600;
+unsigned int screen_width = 800;
+unsigned int screen_height = 600;
 
 // Camera
 glm::vec3 cameraPos = glm::vec3(0.0f, 0.0f, 3.0f);
 Camera camera(cameraPos);
-float lastX = SCR_WIDTH / 2.0f;
-float lastY = SCR_HEIGHT / 2.0f;
+float lastX = screen_width / 2.0f;
+float lastY = screen_height / 2.0f;
 
 // deltatime
 float deltaTime = 0.0f; // time between current frame and last frame
@@ -88,6 +89,13 @@ float lightLinear = 0.09f;
 float lightQuadratic = 0.032f;
 float flashlightInnerCutoff = 12.5f;
 float flashlightOuterCutoff = 17.5f;
+unsigned int uboMatrices;
+unsigned int framebufferMSSA;
+unsigned int textureColorBufferMSSA;
+unsigned int rboMSSA;
+unsigned int intermediateFBO;
+unsigned int screenTexture;
+
 //////////////////
 
 int main()
@@ -101,7 +109,7 @@ int main()
     glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
     glfwWindowHint(GLFW_SAMPLES, 8);
 
-    GLFWwindow *window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "LearnOpenGL", NULL, NULL);
+    GLFWwindow *window = glfwCreateWindow(screen_width, screen_height, "LearnOpenGL", NULL, NULL);
     if (window == NULL)
     {
         std::cout << "Failed to create GLFW window" << std::endl;
@@ -227,7 +235,7 @@ int main()
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void *)0);
     glBindVertexArray(0);
     // UBO's
-    unsigned int uboMatrices;
+    // unsigned int uboMatrices;
     glGenBuffers(1, &uboMatrices);
 
     glBindBuffer(GL_UNIFORM_BUFFER, uboMatrices);
@@ -237,16 +245,16 @@ int main()
     glBindBufferRange(GL_UNIFORM_BUFFER, 0, uboMatrices, 0, 2 * sizeof(glm::mat4));
 
     // framebuffers
-    unsigned int framebufferMSSA;
+    // unsigned int framebufferMSSA;
     glGenFramebuffers(1, &framebufferMSSA);
     glBindFramebuffer(GL_FRAMEBUFFER, framebufferMSSA);
 
     // Attach a color buffer texture to the framebuffer's color attachment point
-    unsigned int textureColorBufferMSSA;
+    // unsigned int textureColorBufferMSSA;
     glGenTextures(1, &textureColorBufferMSSA);
     glBindTexture(GL_TEXTURE_2D_MULTISAMPLE, textureColorBufferMSSA);
     int samples = 4; // Number of samples for multisampling
-    glTexImage2DMultisample(GL_TEXTURE_2D_MULTISAMPLE, samples, GL_RGB, SCR_WIDTH, SCR_HEIGHT, GL_TRUE);
+    glTexImage2DMultisample(GL_TEXTURE_2D_MULTISAMPLE, samples, GL_RGB, screen_width, screen_height, GL_TRUE);
 
     // Dont use
     // glTexParameteri(GL_TEXTURE_2D_MULTISAMPLE, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
@@ -257,35 +265,35 @@ int main()
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D_MULTISAMPLE, textureColorBufferMSSA, 0);
 
     // buffer for depth and stencil attachment // obviusly using texture this approach is for sampling data from depth and stencil buffer, if we dont need to sample we can use renderbuffer which is faster
-    // glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH24_STENCIL8, SCR_WIDTH, SCR_HEIGHT, 0, GL_DEPTH_STENCIL, GL_UNSIGNED_INT_24_8, NULL);
+    // glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH24_STENCIL8, screen_width, screen_height, 0, GL_DEPTH_STENCIL, GL_UNSIGNED_INT_24_8, NULL);
 
     // glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_TEXTURE_2D, textureColorBufferMSSA, 0);
 
     // attachments
     // renderbuffer object for depth and stencil attachment (we won't be sampling these)
-    unsigned int rbo;
-    glGenRenderbuffers(1, &rbo);
-    glBindRenderbuffer(GL_RENDERBUFFER, rbo);
-    glRenderbufferStorageMultisample(GL_RENDERBUFFER, 4, GL_DEPTH24_STENCIL8, SCR_WIDTH, SCR_HEIGHT);
+    // unsigned int rboMSSA;
+    glGenRenderbuffers(1, &rboMSSA);
+    glBindRenderbuffer(GL_RENDERBUFFER, rboMSSA);
+    glRenderbufferStorageMultisample(GL_RENDERBUFFER, 4, GL_DEPTH24_STENCIL8, screen_width, screen_height);
 
     glBindRenderbuffer(GL_RENDERBUFFER, 0);
 
-    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, rbo);
+    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, rboMSSA);
     if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
         std::cout << "ERROR::FRAMEBUFFER:: Framebuffer is not complete!" << std::endl;
 
     // glDeleteFramebuffers(1, &framebufferMSSA);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
-    
+
     // THe intemediate framebuffer for resolving multisampled framebuffer
-    unsigned int intermediateFBO;
+    // unsigned int intermediateFBO;
     glGenFramebuffers(1, &intermediateFBO);
     glBindFramebuffer(GL_FRAMEBUFFER, intermediateFBO);
-    unsigned int screenTexture;
+    // unsigned int screenTexture;
     glGenTextures(1, &screenTexture);
     glBindTexture(GL_TEXTURE_2D, screenTexture);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, SCR_WIDTH, SCR_HEIGHT, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
-    
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, screen_width, screen_height, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
+
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
@@ -314,7 +322,7 @@ int main()
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
     glfwSwapBuffers(window);
     glfwShowWindow(window);
-    glfwSetCursorPos(window, SCR_WIDTH / 2.0, SCR_HEIGHT / 2.0);
+    glfwSetCursorPos(window, screen_width / 2.0, screen_height / 2.0);
 
     // model default
     glm::mat4 model = glm::mat4(1.0f);
@@ -388,9 +396,7 @@ int main()
     }
 
     // setting uniforms that won't change in the render loop
-    glBindBuffer(GL_UNIFORM_BUFFER, uboMatrices);
-    glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
-    glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(glm::mat4), glm::value_ptr(projection));
+    updateProjection();
 
     while (!glfwWindowShouldClose(window))
     {
@@ -453,7 +459,7 @@ int main()
         // Blit framebuffer first
         glBindFramebuffer(GL_READ_FRAMEBUFFER, framebufferMSSA);
         glBindFramebuffer(GL_DRAW_FRAMEBUFFER, intermediateFBO);
-        glBlitFramebuffer(0, 0, SCR_WIDTH, SCR_HEIGHT, 0, 0, SCR_WIDTH, SCR_HEIGHT, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+        glBlitFramebuffer(0, 0, screen_width, screen_height, 0, 0, screen_width, screen_height, GL_COLOR_BUFFER_BIT, GL_NEAREST);
 
         // Now the window's framebuffer default
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -490,11 +496,38 @@ int main()
     return 0;
 }
 
+void updateProjection()
+{
+    glBindBuffer(GL_UNIFORM_BUFFER, uboMatrices);
+    float ratio = static_cast<float>(screen_width) / static_cast<float>(screen_height);
+    glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), ratio, 0.1f, 100.0f);
+    glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(glm::mat4), glm::value_ptr(projection));
+}
+
 void framebuffer_size_callback([[maybe_unused]] GLFWwindow *window, int width, int height)
 {
-    SCR_WIDTH = width;
-    SCR_HEIGHT = height;
-    glViewport(0, 0, width, height);
+    screen_width = width;
+    screen_height = height;
+    updateProjection();
+    glViewport(0, 0, screen_width, screen_height);
+    // Volvemos a configurar las texturas y el framebuffer para el nuevo tamaño
+    glBindFramebuffer(GL_FRAMEBUFFER, framebufferMSSA);
+
+    // Actualizar la textura color buffer asociada al framebuffer de MSAA
+    glBindTexture(GL_TEXTURE_2D_MULTISAMPLE, textureColorBufferMSSA);
+    glTexImage2DMultisample(GL_TEXTURE_2D_MULTISAMPLE, 4, GL_RGB, screen_width, screen_height, GL_TRUE);
+
+    // Actualizamos el renderbuffer de profundidad y stencil
+    glBindRenderbuffer(GL_RENDERBUFFER, rboMSSA);
+    glRenderbufferStorageMultisample(GL_RENDERBUFFER, 4, GL_DEPTH24_STENCIL8, screen_width, screen_height);
+
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+    // Actualizamos la textura del framebuffer intermedio
+    glBindFramebuffer(GL_FRAMEBUFFER, intermediateFBO);
+    glBindTexture(GL_TEXTURE_2D, screenTexture);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, screen_width, screen_height, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
 void mouse_callback([[maybe_unused]] GLFWwindow *window, double xpos, double ypos)
