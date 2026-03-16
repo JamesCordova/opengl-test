@@ -82,8 +82,12 @@ glm::vec3 mirrorCenterPos(0.0f, 0.5f, -4.5f);
 glm::vec3 cubeColor(1.0f, 0.5f, 0.31f);
 glm::vec3 framebufferColor(0.2f, 0.3f, 0.3f);
 // light things
-glm::vec3 lightPos(1.2f, 1.0f, 2.0f);
+glm::vec3 lightPos(0.0f, 0.0f, 0.0f);
 glm::vec3 lightDirection(-0.5f, -0.2f, -0.3f);
+glm::vec3 lightAmbient(0.25f, 0.25f, 0.25f);
+glm::vec3 lightDiffuse(0.9f, 0.9f, 0.9f);
+glm::vec3 lightSpecular(0.5f, 0.5f, 0.5f);
+float shininess = 32.0f;
 float lightConstant = 1.0f;
 float lightLinear = 0.09f;
 float lightQuadratic = 0.032f;
@@ -95,6 +99,7 @@ unsigned int textureColorBufferMSSA;
 unsigned int rboMSSA;
 unsigned int intermediateFBO;
 unsigned int screenTexture;
+bool blinnMode = false;
 
 //////////////////
 
@@ -192,18 +197,30 @@ int main()
         -1.0f, -1.0f, 1.0f,
         1.0f, -1.0f, 1.0f};
 
+    float planeVertices[] = {
+        // positions            // normals         // texcoords
+        10.0f, -0.5f, 10.0f, 0.0f, 1.0f, 0.0f, 10.0f, 0.0f,
+        -10.0f, -0.5f, -10.0f, 0.0f, 1.0f, 0.0f, 0.0f, 10.0f,
+        -10.0f, -0.5f, 10.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f,
+
+        -10.0f, -0.5f, -10.0f, 0.0f, 1.0f, 0.0f, 0.0f, 10.0f,
+        10.0f, -0.5f, 10.0f, 0.0f, 1.0f, 0.0f, 10.0f, 0.0f,
+        10.0f, -0.5f, -10.0f, 0.0f, 1.0f, 0.0f, 10.0f, 10.0f};
+
     std::vector<std::string>
         faces = {"assets/textures/skybox/right.jpg", "assets/textures/skybox/left.jpg", "assets/textures/skybox/top.jpg", "assets/textures/skybox/bottom.jpg", "assets/textures/skybox/front.jpg", "assets/textures/skybox/back.jpg"};
     // Models
     stbi_set_flip_vertically_on_load(true);
     Model planetModel("assets/objects/planet/planet.obj");
     Model rockModel("assets/objects/rock/rock.obj");
+    unsigned int floorTexture = loadTexture("assets/textures/wood.png");
     // Implementation
     Shader shaderQuad("assets/shaders/framebuffersSimpleQuad.vert", "assets/shaders/framebuffersSimpleQuad.frag");
     Shader shaderJustNormals("assets/shaders/geometryShaderNormals.vert", "assets/shaders/geometryShaderNormals.frag", "assets/shaders/geometryShaderNormals.geom");
     Shader shaderInstancingArrays("assets/shaders/instancingArrays.vert", "assets/shaders/instancingArrays.frag");
     Shader shaderPlanet("assets/shaders/instancingPlanet.vert", "assets/shaders/instancingPlanet.frag");
     Shader shaderInstancingRocks("assets/shaders/instancingRealRocks.vert", "assets/shaders/instancingRealRocks.frag");
+    Shader shaderAdvancedLighting("assets/shaders/advancedLightingBlinnPhong.vert", "assets/shaders/advancedLightingBlinnPhong.frag");
     // Set shader programs use the same values
     unsigned int uniformBlockIndexJustNormals = glGetUniformBlockIndex(shaderJustNormals.ID, "Matrices");
     unsigned int uniformBlockIndexPlanet = glGetUniformBlockIndex(shaderPlanet.ID, "Matrices");
@@ -233,6 +250,20 @@ int main()
     glBufferData(GL_ARRAY_BUFFER, sizeof(skyboxVertices), &skyboxVertices, GL_STATIC_DRAW);
     glEnableVertexAttribArray(0);
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void *)0);
+    glBindVertexArray(0);
+    // plane VAO
+    unsigned int planeVAO, planeVBO;
+    glGenVertexArrays(1, &planeVAO);
+    glGenBuffers(1, &planeVBO);
+    glBindVertexArray(planeVAO);
+    glBindBuffer(GL_ARRAY_BUFFER, planeVBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(planeVertices), &planeVertices, GL_STATIC_DRAW);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void *)0);
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void *)(3 * sizeof(float)));
+    glEnableVertexAttribArray(2);
+    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void *)(6 * sizeof(float)));
     glBindVertexArray(0);
     // UBO's
     // unsigned int uboMatrices;
@@ -418,43 +449,58 @@ int main()
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
 
         // Draw
-        model = glm::mat4(1.0f);
-        model = glm::translate(model, mirrorCenterPos);
-        model = glm::rotate(model, glm::radians(rotationSpeed * static_cast<float>(glfwGetTime())), glm::vec3(0.0f, 1.0f, 0.0f));
-        shaderPlanet.use();
-        shaderPlanet.setMat4("model", model);
-        // material
-        shaderPlanet.setFloat("material.shininess", 8.0f);
+        // model = glm::mat4(1.0f);
+        // model = glm::translate(model, mirrorCenterPos);
+        // model = glm::rotate(model, glm::radians(rotationSpeed * static_cast<float>(glfwGetTime())), glm::vec3(0.0f, 1.0f, 0.0f));
+        // shaderPlanet.use();
+        // shaderPlanet.setMat4("model", model);
+        // // material
+        // shaderPlanet.setFloat("material.shininess", 8.0f);
         // directional light
-        glm::vec3 lightAmbient = glm::vec3(0.05f, 0.05f, 0.05f);
-        glm::vec3 lightDiffuse = glm::vec3(0.9f, 0.9f, 0.9f);
-        glm::vec3 lightSpecular = glm::vec3(0.5f, 0.5f, 0.5f);
-        shaderPlanet.setVec3("directionalLight.direction", lightDirection);
-        shaderPlanet.setVec3("directionalLight.ambient", lightAmbient);
-        shaderPlanet.setVec3("directionalLight.diffuse", lightDiffuse);
-        shaderPlanet.setVec3("directionalLight.specular", lightSpecular);
-        // draw planet
-        planetModel.Draw(shaderPlanet);
-        // draw rocks
-        shaderInstancingRocks.use();
-        shaderInstancingRocks.setMat4("model", model);
-        // material
-        shaderInstancingRocks.setFloat("material.shininess", 16.0f);
-        // directional light
-        shaderInstancingRocks.setVec3("directionalLight.direction", lightDirection);
-        shaderInstancingRocks.setVec3("directionalLight.ambient", lightAmbient);
-        shaderInstancingRocks.setVec3("directionalLight.diffuse", lightDiffuse);
-        shaderInstancingRocks.setVec3("directionalLight.specular", lightSpecular);
-        shaderInstancingRocks.setInt("texture_diffuse1", 0);
+        // shaderPlanet.setVec3("directionalLight.direction", lightDirection);
+        // shaderPlanet.setVec3("directionalLight.ambient", lightAmbient);
+        // shaderPlanet.setVec3("directionalLight.diffuse", lightDiffuse);
+        // shaderPlanet.setVec3("directionalLight.specular", lightSpecular);
+        // // draw planet
+        // planetModel.Draw(shaderPlanet);
+        // // draw rocks
+        // shaderInstancingRocks.use();
+        // shaderInstancingRocks.setMat4("model", model);
+        // // material
+        // shaderInstancingRocks.setFloat("material.shininess", 16.0f);
+        // // directional light
+        // shaderInstancingRocks.setVec3("directionalLight.direction", lightDirection);
+        // shaderInstancingRocks.setVec3("directionalLight.ambient", lightAmbient);
+        // shaderInstancingRocks.setVec3("directionalLight.diffuse", lightDiffuse);
+        // shaderInstancingRocks.setVec3("directionalLight.specular", lightSpecular);
+        // shaderInstancingRocks.setInt("texture_diffuse1", 0);
+        // glActiveTexture(GL_TEXTURE0);
+        // glBindTexture(GL_TEXTURE_2D, rockModel.textures_loaded[0].id);
+        // for (unsigned int i = 0; i < rockModel.meshes.size(); i++)
+        // {
+        //     glBindVertexArray(rockModel.meshes[i].VAO);
+        //     glDrawElementsInstanced(GL_TRIANGLES, static_cast<GLsizei>(rockModel.meshes[i].indices.size()), GL_UNSIGNED_INT, 0, amount);
+        // }
+        // Draw floor and light
+        shaderAdvancedLighting.use();
+        // for model
+        shaderAdvancedLighting.setMat4("model", glm::mat4(1.0f));
         glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, rockModel.textures_loaded[0].id);
-        for (unsigned int i = 0; i < rockModel.meshes.size(); i++)
-        {
-            glBindVertexArray(rockModel.meshes[i].VAO);
-            glDrawElementsInstanced(GL_TRIANGLES, static_cast<GLsizei>(rockModel.meshes[i].indices.size()), GL_UNSIGNED_INT, 0, amount);
-        }
-        // rockModel.Draw(shaderInstancingRocks);
-        // quads
+        glBindTexture(GL_TEXTURE_2D, floorTexture);
+        shaderAdvancedLighting.setInt("material.texture_diffuse1", 0);
+        shaderAdvancedLighting.setFloat("material.shininess", shininess);
+        // For lighting
+        shaderAdvancedLighting.setBool("blinnMode", blinnMode);
+        shaderAdvancedLighting.setVec3("viewPos", camera.Position);
+        shaderAdvancedLighting.setVec3("pointLight[0].position", lightPos);
+        shaderAdvancedLighting.setVec3("pointLight[0].ambient", lightAmbient);
+        shaderAdvancedLighting.setVec3("pointLight[0].diffuse", lightDiffuse);
+        shaderAdvancedLighting.setVec3("pointLight[0].specular", lightSpecular);
+        shaderAdvancedLighting.setFloat("pointLight[0].constant", lightConstant);
+        shaderAdvancedLighting.setFloat("pointLight[0].linear", lightLinear);
+        shaderAdvancedLighting.setFloat("pointLight[0].quadratic", lightQuadratic);
+        glBindVertexArray(planeVAO);
+        glDrawArrays(GL_TRIANGLES, 0, 6);
 
         // Blit framebuffer first
         glBindFramebuffer(GL_READ_FRAMEBUFFER, framebufferMSSA);
@@ -713,7 +759,13 @@ void imgui_frame_update()
     // ImGui::ColorEdit3("Specular Color", (float *)&cubeSpecularColor);
     // ImGui::SliderFloat("Shininess", &shininess, 1.0f, 256.0f);
     ImGui::Text("Light properties:");
+    ImGui::Checkbox("Blinn-Phong", &blinnMode);
+    ImGui::SliderFloat3("Light position", (float *)&lightPos, -20.0f, 20.0f);
     ImGui::SliderFloat3("Light direction", (float *)&lightDirection, -1.0f, 1.0f);
+    ImGui::ColorEdit3("Light ambient", (float *)&lightAmbient);
+    ImGui::ColorEdit3("Light diffuse", (float *)&lightDiffuse);
+    ImGui::ColorEdit3("Light specular", (float *)&lightSpecular);
+    ImGui::SliderFloat("Shininess", &shininess, 1.0f, 512.0f);
     ImGui::SliderFloat("Flashlight Inner cutoff", &flashlightInnerCutoff, 0.0f, 360.0f);
     ImGui::SliderFloat("Flashlight Outer cutoff", &flashlightOuterCutoff, 0.0f, 360.0f);
     ImGui::InputFloat("Light constant", &lightConstant);
