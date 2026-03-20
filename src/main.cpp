@@ -43,7 +43,7 @@ void DrawColoredCube(Shader &fragCoordShader, unsigned int containerReflectVAO);
 void mouse_callback(GLFWwindow *window, double xpos, double ypos);
 void scroll_callback(GLFWwindow *window, double xoffset, double yoffset);
 void processInput(GLFWwindow *window);
-unsigned int loadTexture(const char *path);
+unsigned int loadTexture(const char *path, bool gammaCorrection = false);
 unsigned int loadCubemap(std::vector<std::string> faces);
 
 void toggleCursor(GLFWwindow *window);
@@ -99,8 +99,9 @@ unsigned int textureColorBufferMSSA;
 unsigned int rboMSSA;
 unsigned int intermediateFBO;
 unsigned int screenTexture;
-bool blinnMode = false;
-
+bool gammaEnabled = false;
+bool textureGammaCorrected = false;
+float gammaFactor = 2.2f;
 //////////////////
 
 int main()
@@ -211,24 +212,11 @@ int main()
         faces = {"assets/textures/skybox/right.jpg", "assets/textures/skybox/left.jpg", "assets/textures/skybox/top.jpg", "assets/textures/skybox/bottom.jpg", "assets/textures/skybox/front.jpg", "assets/textures/skybox/back.jpg"};
     // Models
     stbi_set_flip_vertically_on_load(true);
-    Model planetModel("assets/objects/planet/planet.obj");
-    Model rockModel("assets/objects/rock/rock.obj");
     unsigned int floorTexture = loadTexture("assets/textures/wood.png");
+    unsigned int floorTextureGammaCorrected = loadTexture("assets/textures/wood.png", true);
     // Implementation
     Shader shaderQuad("assets/shaders/framebuffersSimpleQuad.vert", "assets/shaders/framebuffersSimpleQuad.frag");
-    Shader shaderJustNormals("assets/shaders/geometryShaderNormals.vert", "assets/shaders/geometryShaderNormals.frag", "assets/shaders/geometryShaderNormals.geom");
-    Shader shaderInstancingArrays("assets/shaders/instancingArrays.vert", "assets/shaders/instancingArrays.frag");
-    Shader shaderPlanet("assets/shaders/instancingPlanet.vert", "assets/shaders/instancingPlanet.frag");
-    Shader shaderInstancingRocks("assets/shaders/instancingRealRocks.vert", "assets/shaders/instancingRealRocks.frag");
-    Shader shaderAdvancedLighting("assets/shaders/advancedLightingBlinnPhong.vert", "assets/shaders/advancedLightingBlinnPhong.frag");
-    // Set shader programs use the same values
-    unsigned int uniformBlockIndexJustNormals = glGetUniformBlockIndex(shaderJustNormals.ID, "Matrices");
-    unsigned int uniformBlockIndexPlanet = glGetUniformBlockIndex(shaderPlanet.ID, "Matrices");
-    unsigned int uniformBlockIndexInstancingRocks = glGetUniformBlockIndex(shaderInstancingRocks.ID, "Matrices");
-
-    glUniformBlockBinding(shaderJustNormals.ID, uniformBlockIndexJustNormals, 0);
-    glUniformBlockBinding(shaderPlanet.ID, uniformBlockIndexPlanet, 0);
-    glUniformBlockBinding(shaderInstancingRocks.ID, uniformBlockIndexInstancingRocks, 0);
+    Shader shaderGammaComparison("assets/shaders/gammaCorrection.vert", "assets/shaders/gammaCorrection.frag");
     // quadVAO
     unsigned int quadVAO, quadVBO;
     glGenVertexArrays(1, &quadVAO);
@@ -362,69 +350,6 @@ int main()
     glm::mat4 view = camera.GetViewMatrix();
     glBufferSubData(GL_UNIFORM_BUFFER, sizeof(glm::mat4), sizeof(glm::mat4), glm::value_ptr(view));
     glBindBuffer(GL_UNIFORM_BUFFER, 0);
-    // defined positions for instancing
-    unsigned int amount = 1000;
-    glm::mat4 *modelMatrices = new glm::mat4[amount];
-    srand(0);
-    float radius = 15.0f;
-    float offset = 2.5f;
-    for (unsigned int i = 0; i < amount; i++)
-    {
-        model = glm::mat4(1.0f);
-        // model = glm::rotate(model, glm::radians(rotationSpeed * static_cast<float>(glfwGetTime())), glm::vec3(0.0f, 1.0f, 0.0f));
-        // 1. translation: displace along circle with 'radius' in range [-offset, offset]
-        float angle = (float)i / (float)amount * 360.0f;
-        float displacement = (rand() % (int)(2 * offset * 100)) / 100.0f - offset;
-        float x = sin(angle) * radius + displacement;
-        float y = displacement * 0.4f; // keep height of field smaller compared to width of x and z
-        displacement = (rand() % (int)(2 * offset * 100)) / 100.0f - offset;
-        float z = cos(angle) * radius + displacement;
-        model = glm::translate(model, glm::vec3(x, y, z));
-        model = glm::translate(model, mirrorCenterPos); // translate to center of planet
-
-        // 2. scale: Scale between 0.05 and 0.25f
-        float scale = (rand() % 20) / 100.0f + 0.05f;
-        model = glm::scale(model, glm::vec3(scale));
-
-        // 3. rotation: add random rotation around a (semi)randomly picked rotation axis vector
-        float rotAngle = static_cast<float>(rand() % 360);
-        model = glm::rotate(model, glm::radians(rotAngle), glm::vec3(0.4f, 0.6f, 0.8f));
-
-        // 4. now add to list of matrices
-        modelMatrices[i] = model;
-    }
-
-    // buffer for instancing
-    unsigned int modelsByRockVBO;
-    glGenBuffers(1, &modelsByRockVBO);
-    glBindBuffer(GL_ARRAY_BUFFER, modelsByRockVBO);
-    glBufferData(GL_ARRAY_BUFFER, amount * sizeof(glm::mat4), &modelMatrices[0], GL_STATIC_DRAW);
-    // glBindBuffer(GL_ARRAY_BUFFER, 0); We need the data for the vertex attribute pointers, dont unbind
-    // glEnableVertexAttribArray(3);
-    // glVertexAttribPointer(3, )
-    for (unsigned int i = 0; i < rockModel.meshes.size(); i++)
-    {
-        unsigned int VAO = rockModel.meshes[i].VAO;
-        glBindVertexArray(VAO);
-        // glBindBuffer(GL_ARRAY_BUFFER, modelsByRockVBO); // bind it if was unbinded it
-        // set attribute pointers for matrix (4 times vec4)
-        std::size_t vec4Size = sizeof(glm::vec4);
-        glEnableVertexAttribArray(3);
-        glVertexAttribPointer(3, 4, GL_FLOAT, GL_FALSE, 4 * static_cast<GLsizei>(vec4Size), (void *)0);
-        glEnableVertexAttribArray(4);
-        glVertexAttribPointer(4, 4, GL_FLOAT, GL_FALSE, 4 * static_cast<GLsizei>(vec4Size), (void *)(1 * vec4Size));
-        glEnableVertexAttribArray(5);
-        glVertexAttribPointer(5, 4, GL_FLOAT, GL_FALSE, 4 * static_cast<GLsizei>(vec4Size), (void *)(2 * vec4Size));
-        glEnableVertexAttribArray(6);
-        glVertexAttribPointer(6, 4, GL_FLOAT, GL_FALSE, 4 * static_cast<GLsizei>(vec4Size), (void *)(3 * vec4Size));
-
-        glVertexAttribDivisor(3, 1);
-        glVertexAttribDivisor(4, 1);
-        glVertexAttribDivisor(5, 1);
-        glVertexAttribDivisor(6, 1);
-
-        glBindVertexArray(0);
-    }
 
     // setting uniforms that won't change in the render loop
     updateProjection();
@@ -448,57 +373,25 @@ int main()
         glClearColor(framebufferColor.r, framebufferColor.g, framebufferColor.b, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
 
-        // Draw
-        // model = glm::mat4(1.0f);
-        // model = glm::translate(model, mirrorCenterPos);
-        // model = glm::rotate(model, glm::radians(rotationSpeed * static_cast<float>(glfwGetTime())), glm::vec3(0.0f, 1.0f, 0.0f));
-        // shaderPlanet.use();
-        // shaderPlanet.setMat4("model", model);
-        // // material
-        // shaderPlanet.setFloat("material.shininess", 8.0f);
-        // directional light
-        // shaderPlanet.setVec3("directionalLight.direction", lightDirection);
-        // shaderPlanet.setVec3("directionalLight.ambient", lightAmbient);
-        // shaderPlanet.setVec3("directionalLight.diffuse", lightDiffuse);
-        // shaderPlanet.setVec3("directionalLight.specular", lightSpecular);
-        // // draw planet
-        // planetModel.Draw(shaderPlanet);
-        // // draw rocks
-        // shaderInstancingRocks.use();
-        // shaderInstancingRocks.setMat4("model", model);
-        // // material
-        // shaderInstancingRocks.setFloat("material.shininess", 16.0f);
-        // // directional light
-        // shaderInstancingRocks.setVec3("directionalLight.direction", lightDirection);
-        // shaderInstancingRocks.setVec3("directionalLight.ambient", lightAmbient);
-        // shaderInstancingRocks.setVec3("directionalLight.diffuse", lightDiffuse);
-        // shaderInstancingRocks.setVec3("directionalLight.specular", lightSpecular);
-        // shaderInstancingRocks.setInt("texture_diffuse1", 0);
-        // glActiveTexture(GL_TEXTURE0);
-        // glBindTexture(GL_TEXTURE_2D, rockModel.textures_loaded[0].id);
-        // for (unsigned int i = 0; i < rockModel.meshes.size(); i++)
-        // {
-        //     glBindVertexArray(rockModel.meshes[i].VAO);
-        //     glDrawElementsInstanced(GL_TRIANGLES, static_cast<GLsizei>(rockModel.meshes[i].indices.size()), GL_UNSIGNED_INT, 0, amount);
-        // }
         // Draw floor and light
-        shaderAdvancedLighting.use();
+        shaderGammaComparison.use();
         // for model
-        shaderAdvancedLighting.setMat4("model", glm::mat4(1.0f));
+        shaderGammaComparison.setMat4("model", glm::mat4(1.0f));
         glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, floorTexture);
-        shaderAdvancedLighting.setInt("material.texture_diffuse1", 0);
-        shaderAdvancedLighting.setFloat("material.shininess", shininess);
+        glBindTexture(GL_TEXTURE_2D, textureGammaCorrected ? floorTextureGammaCorrected : floorTexture);
+        shaderGammaComparison.setInt("material.texture_diffuse1", 0);
+        shaderGammaComparison.setFloat("material.shininess", shininess);
         // For lighting
-        shaderAdvancedLighting.setBool("blinnMode", blinnMode);
-        shaderAdvancedLighting.setVec3("viewPos", camera.Position);
-        shaderAdvancedLighting.setVec3("pointLight[0].position", lightPos);
-        shaderAdvancedLighting.setVec3("pointLight[0].ambient", lightAmbient);
-        shaderAdvancedLighting.setVec3("pointLight[0].diffuse", lightDiffuse);
-        shaderAdvancedLighting.setVec3("pointLight[0].specular", lightSpecular);
-        shaderAdvancedLighting.setFloat("pointLight[0].constant", lightConstant);
-        shaderAdvancedLighting.setFloat("pointLight[0].linear", lightLinear);
-        shaderAdvancedLighting.setFloat("pointLight[0].quadratic", lightQuadratic);
+        shaderGammaComparison.setBool("gammaEnabled", gammaEnabled);
+        shaderGammaComparison.setFloat("gammaFactor", gammaFactor);
+        shaderGammaComparison.setVec3("viewPos", camera.Position);
+        shaderGammaComparison.setVec3("pointLight[0].position", lightPos);
+        shaderGammaComparison.setVec3("pointLight[0].ambient", lightAmbient);
+        shaderGammaComparison.setVec3("pointLight[0].diffuse", lightDiffuse);
+        shaderGammaComparison.setVec3("pointLight[0].specular", lightSpecular);
+        shaderGammaComparison.setFloat("pointLight[0].constant", lightConstant);
+        shaderGammaComparison.setFloat("pointLight[0].linear", lightLinear);
+        shaderGammaComparison.setFloat("pointLight[0].quadratic", lightQuadratic);
         glBindVertexArray(planeVAO);
         glDrawArrays(GL_TRIANGLES, 0, 6);
 
@@ -624,39 +517,48 @@ void processInput(GLFWwindow *window)
     toggleWireframe(window);
 }
 
-unsigned int loadTexture(const char *path)
+unsigned int loadTexture(const char *path, bool gammaCorrection)
 {
     unsigned int textureID;
     glGenTextures(1, &textureID);
 
     int width, height, nrComponents;
     unsigned char *data = stbi_load(path, &width, &height, &nrComponents, 0);
-    if (data)
-    {
-        GLenum format;
-        if (nrComponents == 1)
-            format = GL_RED;
-        else if (nrComponents == 3)
-            format = GL_RGB;
-        else if (nrComponents == 4)
-            format = GL_RGBA;
-        else
-            format = GL_RGB; // default to RGB if unknown
 
-        // wrapping and filtering options
-        glBindTexture(GL_TEXTURE_2D, textureID);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, format == GL_RGBA ? GL_CLAMP_TO_EDGE : GL_REPEAT);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, format == GL_RGBA ? GL_CLAMP_TO_EDGE : GL_REPEAT);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-        // load texture data
-        glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format, GL_UNSIGNED_BYTE, data);
-        glGenerateMipmap(GL_TEXTURE_2D);
-    }
-    else
+    if (!data)
     {
         std::cout << "Texture failed to load at path: " << path << std::endl;
+        return 0;
     }
+
+    GLenum internalFormat;
+    GLenum dataFormat;
+    if (nrComponents == 1)
+    {
+        dataFormat = GL_RED;
+        internalFormat = GL_RED;
+    }
+    else if (nrComponents == 4)
+    {
+        internalFormat = gammaCorrection ? GL_SRGB_ALPHA : GL_RGBA;
+        dataFormat = GL_RGBA;
+    }
+    else // if (nrComponents == 3)
+    {
+        internalFormat = gammaCorrection ? GL_SRGB : GL_RGB;
+        dataFormat = GL_RGB;
+    } // default to RGB if unknown
+
+    // wrapping and filtering options
+    glBindTexture(GL_TEXTURE_2D, textureID);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, dataFormat == GL_RGBA ? GL_CLAMP_TO_EDGE : GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, dataFormat == GL_RGBA ? GL_CLAMP_TO_EDGE : GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    // load texture data
+    glTexImage2D(GL_TEXTURE_2D, 0, internalFormat, width, height, 0, dataFormat, GL_UNSIGNED_BYTE, data);
+    glGenerateMipmap(GL_TEXTURE_2D);
+
     stbi_image_free(data);
 
     return textureID;
@@ -751,15 +653,10 @@ void imgui_frame_update()
     ImGui::SliderFloat("Camera Speed", &camera.MovementSpeed, 0.0f, 250.0f);
     ImGui::SliderFloat("Mouse Sensitivity", &camera.MouseSensitivity, 0.0f, 1.0f);
     ImGui::ColorEdit3("Framebuffer Color", (float *)&framebufferColor);
-    // ImGui::ColorEdit3("Cube Color", (float *)&cubeColor);
-    // ImGui::SliderFloat3("Cube position", (float *)&cubePos, -20.0f, 20.0f);
-    // // 3 coloredits and 1 slider float
-    // ImGui::ColorEdit3("Ambient Color", (float *)&cubeAmbientColor);
-    // ImGui::ColorEdit3("Diffuse Color", (float *)&cubeDiffuseColor);
-    // ImGui::ColorEdit3("Specular Color", (float *)&cubeSpecularColor);
-    // ImGui::SliderFloat("Shininess", &shininess, 1.0f, 256.0f);
     ImGui::Text("Light properties:");
-    ImGui::Checkbox("Blinn-Phong", &blinnMode);
+    ImGui::Checkbox("Gamma Correction", &gammaEnabled);
+    ImGui::Checkbox("Texture Gamma Correction", &textureGammaCorrected);
+    ImGui::SliderFloat("Gamma Factor", &gammaFactor, 1.0f, 5.0f);
     ImGui::SliderFloat3("Light position", (float *)&lightPos, -20.0f, 20.0f);
     ImGui::SliderFloat3("Light direction", (float *)&lightDirection, -1.0f, 1.0f);
     ImGui::ColorEdit3("Light ambient", (float *)&lightAmbient);
