@@ -216,7 +216,7 @@ int main()
     // Shader shaderQuad("assets/shaders/framebuffersSimpleQuad.vert", "assets/shaders/framebuffersSimpleQuad.frag");
     Shader shaderSimpleDepth("assets/shaders/shadowMappingDepth.vert", "assets/shaders/shadowMappingDepth.frag");
     Shader shaderDebugDepthQuad("assets/shaders/shadowMappingDepthQuad.vert", "assets/shaders/shadowMappingDepthQuad.frag");
-    Shader shaderResult("assets/shaders/shadowMappingResult.vert", "assets/shaders/shadowMappingResult.frag");
+    Shader shaderResult("assets/shaders/shadowMappingPCF.vert", "assets/shaders/shadowMappingPCF.frag");
     // Shader shaderQuadResult("assets/shaders/shadowMappingQuadResult.vert", "assets/shaders/shadowMappingQuadResult.vert");
     // Configure shader for debug quad
     shaderDebugDepthQuad.use();
