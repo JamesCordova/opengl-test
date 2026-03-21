@@ -210,12 +210,14 @@ int main()
         faces = {"assets/textures/skybox/right.jpg", "assets/textures/skybox/left.jpg", "assets/textures/skybox/top.jpg", "assets/textures/skybox/bottom.jpg", "assets/textures/skybox/front.jpg", "assets/textures/skybox/back.jpg"};
     // Models
     stbi_set_flip_vertically_on_load(true);
-    unsigned int woodTexture = loadTexture("assets/textures/wood.png", true);
+    unsigned int woodTexture = loadTexture("assets/textures/wood.png");
     // unsigned int floorTextureGammaCorrected = loadTexture("assets/textures/wood.png", true);
     // Implementation
     // Shader shaderQuad("assets/shaders/framebuffersSimpleQuad.vert", "assets/shaders/framebuffersSimpleQuad.frag");
     Shader shaderSimpleDepth("assets/shaders/shadowMappingDepth.vert", "assets/shaders/shadowMappingDepth.frag");
     Shader shaderDebugDepthQuad("assets/shaders/shadowMappingDepthQuad.vert", "assets/shaders/shadowMappingDepthQuad.frag");
+    Shader shaderResult("assets/shaders/shadowMappingResult.vert", "assets/shaders/shadowMappingResult.frag");
+    Shader shaderQuadResult("assets/shaders/shadowMappingQuadResult.vert", "assets/shaders/shadowMappingQuadResult.vert");
     // Configure shader for debug quad
     shaderDebugDepthQuad.use();
     shaderDebugDepthQuad.setInt("depthMap", 0);
@@ -425,11 +427,27 @@ int main()
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
         // reset viewport
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
         glViewport(0, 0, screen_width, screen_height);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
+        // render from camera
+        shaderResult.use();
+        glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)screen_width / (float)screen_height, 0.1f, 100.0f);
+        shaderResult.setMat4("projection", projection);
+        shaderResult.setMat4("view", view);
+        shaderResult.setMat4("lightSpaceMatrix", lightSpaceMatrix);
+        glActiveTexture(GL_TEXTURE1);
+        glBindTexture(GL_TEXTURE_2D, textureDepthMap);
+        shaderResult.setInt("shadowMap", 1);
+        shaderResult.setVec3("lightPos", lightPos);
+        shaderResult.setVec3("viewPos", camera.Position);
+        renderScene(shaderResult);
+
         // render Depth map to quad for visual debugging
         // ---------------------------------------------
+        unsigned int depthQuadWidth = 200, depthQuadHeight = 200;
+        glViewport(0, 0,depthQuadWidth, depthQuadHeight);
         shaderDebugDepthQuad.use();
         shaderDebugDepthQuad.setFloat("near_plane", near_plane);
         shaderDebugDepthQuad.setFloat("far_plane", far_plane);
@@ -486,7 +504,7 @@ void renderScene(Shader &shader)
     renderCube();
     model = glm::mat4(1.0f);
     model = glm::translate(model, glm::vec3(-1.0f, 0.0f, 2.0));
-    model = glm::rotate(model, rotationSpeed * glm::radians(60.0f), glm::normalize(glm::vec3(1.0, 0.0, 1.0)));
+    model = glm::rotate(model, glm::radians(rotationSpeed * static_cast<float>(glfwGetTime())), glm::normalize(glm::vec3(1.0, 0.0, 1.0)));
     model = glm::scale(model, glm::vec3(0.25));
     shader.setMat4("model", model);
     renderCube();
