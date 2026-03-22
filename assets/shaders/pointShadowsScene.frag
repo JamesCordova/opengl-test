@@ -50,7 +50,4 @@ void main()
     vec3 lighting = (ambient + ((1.0 - shadow) * (diffuse + specular))) * color;
 
     FragColor = vec4(lighting, 1.0);
-    vec3 fragToLight = fs_in.FragPos - lightPos;
-    float closestDepth = texture(depthMap, fragToLight).r;
-    FragColor = vec4(vec3(closestDepth), 1.0);
 }
