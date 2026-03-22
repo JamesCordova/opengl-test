@@ -216,7 +216,7 @@ int main()
     // Shader shaderQuad("assets/shaders/framebuffersSimpleQuad.vert", "assets/shaders/framebuffersSimpleQuad.frag");
     Shader shaderSimpleDepth("assets/shaders/pointShadowsDepthCubemap.vert", "assets/shaders/pointShadowsDepthCubemap.frag", "assets/shaders/pointShadowsDepthCubemap.geom");
     Shader shaderDebugDepthQuad("assets/shaders/shadowMappingDepthQuad.vert", "assets/shaders/shadowMappingDepthQuad.frag");
-    Shader shaderResult("assets/shaders/pointShadowsScene.vert", "assets/shaders/pointShadowsScene.frag");
+    Shader shaderResult("assets/shaders/pointShadowsScene.vert", "assets/shaders/pointShadowsScenePCF.frag");
     // Shader shaderQuadResult("assets/shaders/shadowMappingQuadResult.vert", "assets/shaders/shadowMappingQuadResult.vert");
     // Configure shader for debug quad
     shaderDebugDepthQuad.use();
@@ -331,13 +331,13 @@ int main()
     glGenFramebuffers(1, &depthMapFBO);
 
     // clean
-    glBindTexture(GL_TEXTURE_2D_MULTISAMPLE, 0);
+    // glBindTexture(GL_TEXTURE_2D_MULTISAMPLE, 0);
     // the texture
     unsigned int textureDepthCubeMap;
     glGenTextures(1, &textureDepthCubeMap);
     glBindTexture(GL_TEXTURE_CUBE_MAP, textureDepthCubeMap);
     for (unsigned int i = 0; i < 6; ++i)
-        glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_DEPTH_COMPONENT32, shadowWidth, shadowHeight, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
+        glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_DEPTH_COMPONENT, shadowWidth, shadowHeight, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
     // wrapping
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
