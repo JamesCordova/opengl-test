@@ -216,7 +216,7 @@ int main()
     // Implementation
     // Shader shaderQuad("assets/shaders/framebuffersSimpleQuad.vert", "assets/shaders/framebuffersSimpleQuad.frag");
     Shader shaderSimpleDepth("assets/shaders/pointShadowsDepthCubemap.vert", "assets/shaders/pointShadowsDepthCubemap.frag", "assets/shaders/pointShadowsDepthCubemap.geom");
-    Shader shaderNormalMapping("assets/shaders/normalMappingTangentSpaceFragment.vert", "assets/shaders/normalMappingTangentSpaceFragment.frag");
+    Shader shaderNormalMapping("assets/shaders/normalMappingTangentSpaceVertex.vert", "assets/shaders/normalMappingTangentSpaceVertex.frag");
     Shader shaderResult("assets/shaders/pointShadowsScene.vert", "assets/shaders/pointShadowsScenePCF.frag");
     // Shader shaderQuadResult("assets/shaders/shadowMappingQuadResult.vert", "assets/shaders/shadowMappingQuadResult.vert");
     // Configure shader for debug quad
