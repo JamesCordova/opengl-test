@@ -4,8 +4,8 @@ out vec4 FragColor;
 in VS_OUT
 {
     vec3 FragPos;
-    vec3 Normal;
     vec2 TexCoords;
+    mat3 TBN;
 }
 fs_in;
 
@@ -20,6 +20,7 @@ void main()
 {
     vec3 normal = texture(normalMap, fs_in.TexCoords).rgb;
     normal = normalize(normal * 2.0 - 1.0);
+    normal = normalize(fs_in.TBN * normal);
     // diffuse texture color
     vec3 color = texture(diffuseMap, fs_in.TexCoords).rgb;
     // ambient
