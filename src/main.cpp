@@ -213,6 +213,7 @@ int main()
     // stbi_set_flip_vertically_on_load(true);
     unsigned int diffuseMap = loadTexture("assets/textures/brickwall.jpg");
     unsigned int normalMap = loadTexture("assets/textures/brickwall_normal.jpg");
+    Model cyborg("assets/objects/cyborg/cyborg.obj");
     // Implementation
     // Shader shaderQuad("assets/shaders/framebuffersSimpleQuad.vert", "assets/shaders/framebuffersSimpleQuad.frag");
     Shader shaderSimpleDepth("assets/shaders/pointShadowsDepthCubemap.vert", "assets/shaders/pointShadowsDepthCubemap.frag", "assets/shaders/pointShadowsDepthCubemap.geom");
@@ -351,6 +352,7 @@ int main()
         shaderNormalMapping.use();
         model = glm::mat4(1.0f);
         model = glm::rotate(model, glm::radians(rotationSpeed * (float)glfwGetTime()), glm::normalize(glm::vec3(1.0f, 0.0f, 1.0f)));
+        model = glm::translate(model, glm::vec3(0.0f, -3.0f, 0.0f));
         shaderNormalMapping.setMat4("model", model);
         shaderNormalMapping.setVec3("lightPos", lightPos);
         shaderNormalMapping.setVec3("viewPos", camera.Position);
@@ -359,7 +361,8 @@ int main()
         glBindTexture(GL_TEXTURE_2D, diffuseMap);
         glActiveTexture(GL_TEXTURE1);
         glBindTexture(GL_TEXTURE_2D, normalMap);
-        renderQuad();
+        // renderQuad();
+        cyborg.Draw(shaderNormalMapping);
 
         // new frame for imgui
         imgui_frame_new();
