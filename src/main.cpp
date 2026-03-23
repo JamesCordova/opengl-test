@@ -78,7 +78,7 @@ glm::vec3 mirrorCenterPos(0.0f, 0.5f, -4.5f);
 glm::vec3 cubeColor(1.0f, 0.5f, 0.31f);
 glm::vec3 framebufferColor(0.2f, 0.3f, 0.3f);
 // light things
-glm::vec3 lightPos(0.0f, 0.0f, 0.0f);
+glm::vec3 lightPos(0.5f, 1.0f, 0.3f);
 glm::vec3 lightDirection(-0.5f, -0.2f, -0.3f);
 glm::vec3 lightAmbient(0.25f, 0.25f, 0.25f);
 glm::vec3 lightDiffuse(0.9f, 0.9f, 0.9f);
@@ -209,54 +209,20 @@ int main()
     std::vector<std::string>
         faces = {"assets/textures/skybox/right.jpg", "assets/textures/skybox/left.jpg", "assets/textures/skybox/top.jpg", "assets/textures/skybox/bottom.jpg", "assets/textures/skybox/front.jpg", "assets/textures/skybox/back.jpg"};
     // Models
-    stbi_set_flip_vertically_on_load(true);
-    unsigned int woodTexture = loadTexture("assets/textures/wood.png");
-    // unsigned int floorTextureGammaCorrected = loadTexture("assets/textures/wood.png", true);
+    // stbi_set_flip_vertically_on_load(true);
+    unsigned int diffuseMap = loadTexture("assets/textures/brickwall.jpg");
+    unsigned int normalMap = loadTexture("assets/textures/brickwall_normal.jpg");
     // Implementation
     // Shader shaderQuad("assets/shaders/framebuffersSimpleQuad.vert", "assets/shaders/framebuffersSimpleQuad.frag");
     Shader shaderSimpleDepth("assets/shaders/pointShadowsDepthCubemap.vert", "assets/shaders/pointShadowsDepthCubemap.frag", "assets/shaders/pointShadowsDepthCubemap.geom");
-    Shader shaderDebugDepthQuad("assets/shaders/shadowMappingDepthQuad.vert", "assets/shaders/shadowMappingDepthQuad.frag");
+    Shader shaderNormalMapping("assets/shaders/normalMappingNoTangent.vert", "assets/shaders/normalMappingNoTangent.frag");
     Shader shaderResult("assets/shaders/pointShadowsScene.vert", "assets/shaders/pointShadowsScenePCF.frag");
     // Shader shaderQuadResult("assets/shaders/shadowMappingQuadResult.vert", "assets/shaders/shadowMappingQuadResult.vert");
     // Configure shader for debug quad
-    shaderDebugDepthQuad.use();
-    shaderDebugDepthQuad.setInt("depthMap", 0);
-    // quadVAO
-    // unsigned int quadVAO, quadVBO;
-    // glGenVertexArrays(1, &quadVAO);
-    // glGenBuffers(1, &quadVBO);
-    // glBindVertexArray(quadVAO);
-    // glBindBuffer(GL_ARRAY_BUFFER, quadVBO);
-    // glBufferData(GL_ARRAY_BUFFER, sizeof(quadVertices), &quadVertices, GL_STATIC_DRAW);
-    // glEnableVertexAttribArray(0);
-    // glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void *)0);
-    // glEnableVertexAttribArray(1);
-    // glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void *)(2 * sizeof(float)));
-    // glBindVertexArray(0);
-    // skybox VAO
-    unsigned int skyboxVAO, skyboxVBO;
-    glGenVertexArrays(1, &skyboxVAO);
-    glGenBuffers(1, &skyboxVBO);
-    glBindVertexArray(skyboxVAO);
-    glBindBuffer(GL_ARRAY_BUFFER, skyboxVBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(skyboxVertices), &skyboxVertices, GL_STATIC_DRAW);
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void *)0);
-    glBindVertexArray(0);
-    // plane VAO
-    unsigned int planeVBO; // global planeVAO
-    glGenVertexArrays(1, &planeVAO);
-    glGenBuffers(1, &planeVBO);
-    glBindVertexArray(planeVAO);
-    glBindBuffer(GL_ARRAY_BUFFER, planeVBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(planeVertices), &planeVertices, GL_STATIC_DRAW);
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void *)0);
-    glEnableVertexAttribArray(1);
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void *)(3 * sizeof(float)));
-    glEnableVertexAttribArray(2);
-    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void *)(6 * sizeof(float)));
-    glBindVertexArray(0);
+    shaderNormalMapping.use();
+    shaderNormalMapping.setInt("diffuseMap", 0);
+    shaderNormalMapping.setInt("normalMap", 1);
+    
     // UBO's
     // unsigned int uboMatrices;
     glGenBuffers(1, &uboMatrices);
@@ -326,36 +292,7 @@ int main()
         std::cout << "ERROR::FRAMEBUFFER:: Intermediate framebuffer is not complete!" << std::endl;
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     // depth framebuffer for visualizing depth map
-    unsigned int shadowWidth = 1024, shadowHeight = 1024;
-    unsigned int depthMapFBO;
-    glGenFramebuffers(1, &depthMapFBO);
-
-    // clean
-    // glBindTexture(GL_TEXTURE_2D_MULTISAMPLE, 0);
-    // the texture
-    unsigned int textureDepthCubeMap;
-    glGenTextures(1, &textureDepthCubeMap);
-    glBindTexture(GL_TEXTURE_CUBE_MAP, textureDepthCubeMap);
-    for (unsigned int i = 0; i < 6; ++i)
-        glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_DEPTH_COMPONENT, shadowWidth, shadowHeight, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
-    // wrapping
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
-    // filtering
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    // now the attachments
-    // glBindFramebuffer(GL_FRAMEBUFFER, depthMapFBO);
-    // glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, textureDepthCubeMap, 0);
-    // glDrawBuffer(GL_NONE);
-    // glReadBuffer(GL_NONE);
-
-    glBindFramebuffer(GL_FRAMEBUFFER, depthMapFBO);
-    glFramebufferTexture(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, textureDepthCubeMap, 0);
-    glDrawBuffer(GL_NONE);
-    glReadBuffer(GL_NONE);
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+   
     // finish
     // Configure global opengl state
     glEnable(GL_DEPTH_TEST);
@@ -405,80 +342,22 @@ int main()
         view = camera.GetViewMatrix();
         glBufferSubData(GL_UNIFORM_BUFFER, sizeof(glm::mat4), sizeof(glm::mat4), glm::value_ptr(view));
         glBindBuffer(GL_UNIFORM_BUFFER, 0);
-
-        // Rendering
-        // glBindFramebuffer(GL_FRAMEBUFFER, framebufferMSSA);
-        // glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
-        // glClearColor(framebufferColor.r, framebufferColor.g, framebufferColor.b, 1.0f);
-        // glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
-        // glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
         // Rendering
         glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        // 1. render depth of scene to texture
-        // -----------------------------------------------------------
-        // Draw floor and light
-        // model = glm::mat4(1.0f);
-        // glm::mat4 lightProjection, lightView;
-        // glm::mat4 lightSpaceMatrix;
-        // lightProjection = glm::ortho(-10.0f, 10.0f, -10.0f, 10.0f, near_plane, far_plane);
-        // lightView = glm::lookAt(lightPos, glm::vec3(0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
-        // lightSpaceMatrix = lightProjection * lightView;
-        // for the cubemap
-        glm::mat4 shadowProj= glm::perspective(glm::radians(90.0f), (float) shadowWidth / (float) shadowHeight, near_plane, far_plane);
-        // shadowTransforms need inside loop for light position changes
-        shadowTransforms.clear();
-        shadowTransforms.push_back(shadowProj * glm::lookAt(lightPos, lightPos + glm::vec3( 1.0f,  0.0f,  0.0f), glm::vec3(0.0f, -1.0f,  0.0f)));
-        shadowTransforms.push_back(shadowProj * glm::lookAt(lightPos, lightPos + glm::vec3(-1.0f,  0.0f,  0.0f), glm::vec3(0.0f, -1.0f,  0.0f)));
-        shadowTransforms.push_back(shadowProj * glm::lookAt(lightPos, lightPos + glm::vec3( 0.0f,  1.0f,  0.0f), glm::vec3(0.0f,  0.0f,  1.0f)));
-        shadowTransforms.push_back(shadowProj * glm::lookAt(lightPos, lightPos + glm::vec3( 0.0f, -1.0f,  0.0f), glm::vec3(0.0f,  0.0f, -1.0f)));
-        shadowTransforms.push_back(shadowProj * glm::lookAt(lightPos, lightPos + glm::vec3( 0.0f,  0.0f,  1.0f), glm::vec3(0.0f, -1.0f,  0.0f)));
-        shadowTransforms.push_back(shadowProj * glm::lookAt(lightPos, lightPos + glm::vec3( 0.0f,  0.0f, -1.0f), glm::vec3(0.0f, -1.0f,  0.0f)));
-        // render to cubemap
-        // framebuffer for depth map
-        glViewport(0, 0, shadowWidth, shadowHeight);
-        glBindFramebuffer(GL_FRAMEBUFFER, depthMapFBO);
-            glClear(GL_DEPTH_BUFFER_BIT);
-            shaderSimpleDepth.use();
-            for (unsigned int i = 0; i < 6; ++i)
-                shaderSimpleDepth.setMat4("shadowMatrices[" + std::to_string(i) + "]", shadowTransforms[i]);
-        // setting uniforms
-        shaderSimpleDepth.setFloat("far_plane", far_plane);
-        shaderSimpleDepth.setVec3("lightPos", lightPos);
-        renderScene(shaderSimpleDepth);
-        glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
-        // reset viewport
-        glBindFramebuffer(GL_FRAMEBUFFER, 0);
-        glViewport(0, 0, screen_width, screen_height);
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-        // render from camera
-        shaderResult.use();
-        glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)screen_width / (float)screen_height, 0.1f, 100.0f);
-        shaderResult.setMat4("projection", projection);
-        shaderResult.setMat4("view", view);
-        // set lighting uniforms
-        shaderResult.setVec3("lightPos", lightPos);
-        shaderResult.setVec3("viewPos", camera.Position);
-        shaderResult.setFloat("far_plane", far_plane);
+        // render
+        shaderNormalMapping.use();
+        model = glm::mat4(1.0f);
+        model = glm::rotate(model, glm::radians(rotationSpeed * (float)glfwGetTime()), glm::normalize(glm::vec3(1.0f, 0.0f, 1.0f)));
+        shaderNormalMapping.setMat4("model", model);
+        shaderNormalMapping.setVec3("lightPos", lightPos);
+        shaderNormalMapping.setVec3("viewPos", camera.Position);
+        shaderNormalMapping.setFloat("shininess", shininess);
         glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, woodTexture);
+        glBindTexture(GL_TEXTURE_2D, diffuseMap);
         glActiveTexture(GL_TEXTURE1);
-        glBindTexture(GL_TEXTURE_CUBE_MAP, textureDepthCubeMap);
-        renderScene(shaderResult);
-
-        // render Depth map to quad for visual debugging
-        // ---------------------------------------------
-        unsigned int depthQuadWidth = 200, depthQuadHeight = 200;
-        glViewport(0, 0, depthQuadWidth, depthQuadHeight);
-        shaderDebugDepthQuad.use();
-        shaderDebugDepthQuad.setFloat("near_plane", near_plane);
-        shaderDebugDepthQuad.setFloat("far_plane", far_plane);
-        glActiveTexture(GL_TEXTURE0);
-        // glBindTexture(GL_TEXTURE_2D, textureDepthCubeMap);
+        glBindTexture(GL_TEXTURE_2D, normalMap);
         renderQuad();
 
         // new frame for imgui
@@ -508,6 +387,7 @@ void updateProjection()
     float ratio = static_cast<float>(screen_width) / static_cast<float>(screen_height);
     glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), ratio, 0.1f, 100.0f);
     glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(glm::mat4), glm::value_ptr(projection));
+    glBindBuffer(GL_UNIFORM_BUFFER, 0);
 }
 
 void renderScene(Shader &shader)
@@ -627,28 +507,28 @@ void renderQuad()
 {
     if (quadVAO == 0)
     {
+        // positions
+        glm::vec3 pos1(-1.0f,  1.0f, 0.0f);
+        glm::vec3 pos2(-1.0f, -1.0f, 0.0f);
+        glm::vec3 pos3( 1.0f, -1.0f, 0.0f);
+        glm::vec3 pos4( 1.0f,  1.0f, 0.0f);
+        // texture coordinates
+        glm::vec2 uv1(0.0f, 1.0f);
+        glm::vec2 uv2(0.0f, 0.0f);
+        glm::vec2 uv3(1.0f, 0.0f);  
+        glm::vec2 uv4(1.0f, 1.0f);
+        // normal vector
+        glm::vec3 nm(0.0f, 0.0f, 1.0f);
+
         float quadVertices[] = {
-            // positions        // texture Coords
-            -1.0f,
-            1.0f,
-            0.0f,
-            0.0f,
-            1.0f,
-            -1.0f,
-            -1.0f,
-            0.0f,
-            0.0f,
-            0.0f,
-            1.0f,
-            1.0f,
-            0.0f,
-            1.0f,
-            1.0f,
-            1.0f,
-            -1.0f,
-            0.0f,
-            1.0f,
-            0.0f,
+            // positions            // normal         // texcoords  // tangent                          // bitangent
+            pos1.x, pos1.y, pos1.z, nm.x, nm.y, nm.z, uv1.x, uv1.y,
+            pos2.x, pos2.y, pos2.z, nm.x, nm.y, nm.z, uv2.x, uv2.y,
+            pos3.x, pos3.y, pos3.z, nm.x, nm.y, nm.z, uv3.x, uv3.y,
+
+            pos1.x, pos1.y, pos1.z, nm.x, nm.y, nm.z, uv1.x, uv1.y,
+            pos3.x, pos3.y, pos3.z, nm.x, nm.y, nm.z, uv3.x, uv3.y,
+            pos4.x, pos4.y, pos4.z, nm.x, nm.y, nm.z, uv4.x, uv4.y
         };
         glGenVertexArrays(1, &quadVAO);
         glGenBuffers(1, &quadVBO);
@@ -656,12 +536,14 @@ void renderQuad()
         glBindBuffer(GL_ARRAY_BUFFER, quadVBO);
         glBufferData(GL_ARRAY_BUFFER, sizeof(quadVertices), &quadVertices, GL_STATIC_DRAW);
         glEnableVertexAttribArray(0);
-        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void *)0);
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void *)0);
         glEnableVertexAttribArray(1);
-        glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void *)(3 * sizeof(float)));
+        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void *)(3 * sizeof(float)));
+        glEnableVertexAttribArray(2);
+        glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void *)(6 * sizeof(float)));
     }
     glBindVertexArray(quadVAO);
-    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+    glDrawArrays(GL_TRIANGLES, 0, 6);
     glBindVertexArray(0);
 }
 
@@ -884,7 +766,7 @@ void imgui_frame_update()
     ImGui::ColorEdit3("Light ambient", (float *)&lightAmbient);
     ImGui::ColorEdit3("Light diffuse", (float *)&lightDiffuse);
     ImGui::ColorEdit3("Light specular", (float *)&lightSpecular);
-    ImGui::SliderFloat("Shininess", &shininess, 1.0f, 512.0f);
+    ImGui::SliderFloat("Shininess", &shininess, 0.1f, 512.0f);
     ImGui::SliderFloat("Flashlight Inner cutoff", &flashlightInnerCutoff, 0.0f, 360.0f);
     ImGui::SliderFloat("Flashlight Outer cutoff", &flashlightOuterCutoff, 0.0f, 360.0f);
     ImGui::InputFloat("Light constant", &lightConstant);
