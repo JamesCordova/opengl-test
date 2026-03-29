@@ -85,6 +85,7 @@ glm::vec3 lightAmbient(0.25f, 0.25f, 0.25f);
 glm::vec3 lightDiffuse(0.9f, 0.9f, 0.9f);
 glm::vec3 lightSpecular(0.5f, 0.5f, 0.5f);
 float shininess = 32.0f;
+float heightScale = 0.1f;
 float lightConstant = 1.0f;
 float lightLinear = 0.09f;
 float lightQuadratic = 0.032f;
@@ -211,19 +212,20 @@ int main()
         faces = {"assets/textures/skybox/right.jpg", "assets/textures/skybox/left.jpg", "assets/textures/skybox/top.jpg", "assets/textures/skybox/bottom.jpg", "assets/textures/skybox/front.jpg", "assets/textures/skybox/back.jpg"};
     // Models
     // stbi_set_flip_vertically_on_load(true);
-    unsigned int diffuseMap = loadTexture("assets/textures/brickwall.jpg");
-    unsigned int normalMap = loadTexture("assets/textures/brickwall_normal.jpg");
-    Model cyborg("assets/objects/cyborg/cyborg.obj");
+    unsigned int diffuseMap = loadTexture("assets/textures/bricks2.jpg");
+    unsigned int normalMap = loadTexture("assets/textures/bricks2_normal.jpg");
+    unsigned int displacementMap = loadTexture("assets/textures/bricks2_disp.jpg");
     // Implementation
     // Shader shaderQuad("assets/shaders/framebuffersSimpleQuad.vert", "assets/shaders/framebuffersSimpleQuad.frag");
     Shader shaderSimpleDepth("assets/shaders/pointShadowsDepthCubemap.vert", "assets/shaders/pointShadowsDepthCubemap.frag", "assets/shaders/pointShadowsDepthCubemap.geom");
-    Shader shaderNormalMapping("assets/shaders/normalMappingTangentSpaceVertex.vert", "assets/shaders/normalMappingTangentSpaceVertex.frag");
+    Shader shaderParallaxMapping("assets/shaders/parallaxMapping.vert", "assets/shaders/parallaxMapping.frag");
     Shader shaderResult("assets/shaders/pointShadowsScene.vert", "assets/shaders/pointShadowsScenePCF.frag");
     // Shader shaderQuadResult("assets/shaders/shadowMappingQuadResult.vert", "assets/shaders/shadowMappingQuadResult.vert");
     // Configure shader for debug quad
-    shaderNormalMapping.use();
-    shaderNormalMapping.setInt("diffuseMap", 0);
-    shaderNormalMapping.setInt("normalMap", 1);
+    shaderParallaxMapping.use();
+    shaderParallaxMapping.setInt("diffuseMap", 0);
+    shaderParallaxMapping.setInt("normalMap", 1);
+    shaderParallaxMapping.setInt("depthMap", 2);
     
     // UBO's
     // unsigned int uboMatrices;
@@ -349,20 +351,21 @@ int main()
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         // render
-        shaderNormalMapping.use();
+        shaderParallaxMapping.use();
         model = glm::mat4(1.0f);
         model = glm::rotate(model, glm::radians(rotationSpeed * (float)glfwGetTime()), glm::normalize(glm::vec3(1.0f, 0.0f, 1.0f)));
-        model = glm::translate(model, glm::vec3(0.0f, -3.0f, 0.0f));
-        shaderNormalMapping.setMat4("model", model);
-        shaderNormalMapping.setVec3("lightPos", lightPos);
-        shaderNormalMapping.setVec3("viewPos", camera.Position);
-        shaderNormalMapping.setFloat("shininess", shininess);
+        shaderParallaxMapping.setMat4("model", model);
+        shaderParallaxMapping.setVec3("lightPos", lightPos);
+        shaderParallaxMapping.setVec3("viewPos", camera.Position);
+        shaderParallaxMapping.setFloat("shininess", shininess);
+        shaderParallaxMapping.setFloat("heightScale", heightScale);
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, diffuseMap);
         glActiveTexture(GL_TEXTURE1);
         glBindTexture(GL_TEXTURE_2D, normalMap);
-        // renderQuad();
-        cyborg.Draw(shaderNormalMapping);
+        glActiveTexture(GL_TEXTURE2);
+        glBindTexture(GL_TEXTURE_2D, displacementMap);
+        renderQuad();
 
         // new frame for imgui
         imgui_frame_new();
@@ -812,6 +815,7 @@ void imgui_frame_update()
     ImGui::ColorEdit3("Light diffuse", (float *)&lightDiffuse);
     ImGui::ColorEdit3("Light specular", (float *)&lightSpecular);
     ImGui::SliderFloat("Shininess", &shininess, 0.1f, 512.0f);
+    ImGui::SliderFloat("Height Scale", &heightScale, 0.0f, 2.0f);
     ImGui::SliderFloat("Flashlight Inner cutoff", &flashlightInnerCutoff, 0.0f, 360.0f);
     ImGui::SliderFloat("Flashlight Outer cutoff", &flashlightOuterCutoff, 0.0f, 360.0f);
     ImGui::InputFloat("Light constant", &lightConstant);
