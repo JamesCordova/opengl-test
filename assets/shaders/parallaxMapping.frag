@@ -25,6 +25,9 @@ void main()
     // displacement of texCoords
     vec3 viewDir = normalize(fs_in.TangentViewPos - fs_in.TangentFragPos);
     vec2 texCoords = ParallaxMapping(fs_in.TexCoords, viewDir);
+    // discard effect
+    if (texCoords.x > 1.0 || texCoords.y > 1.0 || texCoords.x < 0.0 || texCoords.y < 0.0)
+        discard;
     // normal value
     vec3 normal = texture(normalMap, texCoords).rgb;
     normal = normalize(normal * 2.0 - 1.0);
