@@ -94,14 +94,16 @@ float flashlightOuterCutoff = 17.5f;
 float near_plane = 1.0f;
 float far_plane = 25.0f;
 unsigned int uboMatrices;
-unsigned int framebufferMSSA;
-unsigned int textureColorBufferMSSA;
-unsigned int rboMSSA;
-unsigned int intermediateFBO;
 unsigned int screenTexture;
 bool gammaEnabled = false;
 bool textureGammaCorrected = false;
+bool hdrEnabled = false;
+float exposure = 1.0f;
 float gammaFactor = 2.2f;
+//////////////////
+unsigned int framebufferHDR;
+unsigned int colorBufferHDR;
+unsigned int rboDepthHDR;
 //////////////////
 unsigned int planeVAO;
 
@@ -212,20 +214,24 @@ int main()
         faces = {"assets/textures/skybox/right.jpg", "assets/textures/skybox/left.jpg", "assets/textures/skybox/top.jpg", "assets/textures/skybox/bottom.jpg", "assets/textures/skybox/front.jpg", "assets/textures/skybox/back.jpg"};
     // Models
     // stbi_set_flip_vertically_on_load(true);
-    unsigned int diffuseMap = loadTexture("assets/textures/bricks2.jpg");
-    unsigned int normalMap = loadTexture("assets/textures/bricks2_normal.jpg");
-    unsigned int displacementMap = loadTexture("assets/textures/bricks2_disp.jpg");
+    // unsigned int diffuseMap = loadTexture("assets/textures/bricks2.jpg");
+    // unsigned int normalMap = loadTexture("assets/textures/bricks2_normal.jpg");
+    // unsigned int displacementMap = loadTexture("assets/textures/bricks2_disp.jpg");
+    unsigned int woodTexture = loadTexture("assets/textures/wood.png");
     // Implementation
-    // Shader shaderQuad("assets/shaders/framebuffersSimpleQuad.vert", "assets/shaders/framebuffersSimpleQuad.frag");
-    Shader shaderSimpleDepth("assets/shaders/pointShadowsDepthCubemap.vert", "assets/shaders/pointShadowsDepthCubemap.frag", "assets/shaders/pointShadowsDepthCubemap.geom");
-    Shader shaderParallaxMapping("assets/shaders/parallaxMappingSteepOclussion.vert", "assets/shaders/parallaxMappingSteepOclussion.frag");
-    Shader shaderResult("assets/shaders/pointShadowsScene.vert", "assets/shaders/pointShadowsScenePCF.frag");
-    // Shader shaderQuadResult("assets/shaders/shadowMappingQuadResult.vert", "assets/shaders/shadowMappingQuadResult.vert");
+    Shader shaderLightingScene("assets/shaders/hdrLightingScene.vert", "assets/shaders/hdrLightingScene.frag");
+    Shader shaderHDRToneMapping("assets/shaders/hdrQuadToneMapped.vert", "assets/shaders/hdrQuadToneMapped.frag");
+
     // Configure shader for debug quad
-    shaderParallaxMapping.use();
-    shaderParallaxMapping.setInt("diffuseMap", 0);
-    shaderParallaxMapping.setInt("normalMap", 1);
-    shaderParallaxMapping.setInt("depthMap", 2);
+    shaderLightingScene.use();
+    shaderLightingScene.setInt("diffuseTexture", 0);
+
+    // Bind uniform block to binding point
+    GLuint matricesIndex = glGetUniformBlockIndex(shaderLightingScene.ID, "Matrices");
+    glUniformBlockBinding(shaderLightingScene.ID, matricesIndex, 0);
+
+    shaderHDRToneMapping.use();
+    shaderHDRToneMapping.setInt("hdrBuffer", 0);
 
     // UBO's
     // unsigned int uboMatrices;
@@ -237,65 +243,41 @@ int main()
 
     glBindBufferRange(GL_UNIFORM_BUFFER, 0, uboMatrices, 0, 2 * sizeof(glm::mat4));
 
-    // framebuffers
-    // unsigned int framebufferMSSA;
-    glGenFramebuffers(1, &framebufferMSSA);
-    glBindFramebuffer(GL_FRAMEBUFFER, framebufferMSSA);
+    // framebuffer for HDR
+    glGenFramebuffers(1, &framebufferHDR);
+    // color buffer for hdr
 
-    // Attach a color buffer texture to the framebuffer's color attachment point
-    // unsigned int textureColorBufferMSSA;
-    glGenTextures(1, &textureColorBufferMSSA);
-    glBindTexture(GL_TEXTURE_2D_MULTISAMPLE, textureColorBufferMSSA);
-    int samples = 4; // Number of samples for multisampling
-    glTexImage2DMultisample(GL_TEXTURE_2D_MULTISAMPLE, samples, GL_RGB, screen_width, screen_height, GL_TRUE);
-
-    // Dont use
-    // glTexParameteri(GL_TEXTURE_2D_MULTISAMPLE, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    // glTexParameteri(GL_TEXTURE_2D_MULTISAMPLE, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-
-    glBindTexture(GL_TEXTURE_2D_MULTISAMPLE, 0);
-
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D_MULTISAMPLE, textureColorBufferMSSA, 0);
-
-    // buffer for depth and stencil attachment // obviusly using texture this approach is for sampling data from depth and stencil buffer, if we dont need to sample we can use renderbuffer which is faster
-    // glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH24_STENCIL8, screen_width, screen_height, 0, GL_DEPTH_STENCIL, GL_UNSIGNED_INT_24_8, NULL);
-
-    // glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_TEXTURE_2D, textureColorBufferMSSA, 0);
-
-    // attachments
-    // renderbuffer object for depth and stencil attachment (we won't be sampling these)
-    // unsigned int rboMSSA;
-    glGenRenderbuffers(1, &rboMSSA);
-    glBindRenderbuffer(GL_RENDERBUFFER, rboMSSA);
-    glRenderbufferStorageMultisample(GL_RENDERBUFFER, 4, GL_DEPTH24_STENCIL8, screen_width, screen_height);
-
-    glBindRenderbuffer(GL_RENDERBUFFER, 0);
-
-    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, rboMSSA);
-    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
-        std::cout << "ERROR::FRAMEBUFFER:: Framebuffer is not complete!" << std::endl;
-
-    // glDeleteFramebuffers(1, &framebufferMSSA);
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
-    // THe intemediate framebuffer for resolving multisampled framebuffer
-    // unsigned int intermediateFBO;
-    glGenFramebuffers(1, &intermediateFBO);
-    glBindFramebuffer(GL_FRAMEBUFFER, intermediateFBO);
-    // unsigned int screenTexture;
-    glGenTextures(1, &screenTexture);
-    glBindTexture(GL_TEXTURE_2D, screenTexture);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, screen_width, screen_height, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
+    glGenTextures(1, &colorBufferHDR);
+    glBindTexture(GL_TEXTURE_2D, colorBufferHDR);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, screen_width, screen_height, 0, GL_RGBA, GL_FLOAT, NULL);
 
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    // depth buffer, just as normal
 
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, screenTexture, 0);
+    glGenRenderbuffers(1, &rboDepthHDR);
+    glBindRenderbuffer(GL_RENDERBUFFER, rboDepthHDR);
+    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, screen_width, screen_height);
 
+    // the Attachment phase
+    glBindFramebuffer(GL_FRAMEBUFFER, framebufferHDR);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, colorBufferHDR, 0);
+    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, rboDepthHDR);
     if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
-        std::cout << "ERROR::FRAMEBUFFER:: Intermediate framebuffer is not complete!" << std::endl;
+        std::cout << "Framebuffer not complete\n";
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
-    // depth framebuffer for visualizing depth map
+    // positions
+    std::vector<glm::vec3> lightPositions;
+    lightPositions.push_back(glm::vec3(0.0f, 0.0f, 49.5f)); // back light
+    lightPositions.push_back(glm::vec3(-1.4f, -1.9f, 9.0f));
+    lightPositions.push_back(glm::vec3(0.0f, -1.8f, 4.0f));
+    lightPositions.push_back(glm::vec3(0.8f, -1.7f, 6.0f));
+    // colors
+    std::vector<glm::vec3> lightColors;
+    lightColors.push_back(glm::vec3(200.0f, 200.0f, 200.0f));
+    lightColors.push_back(glm::vec3(0.1f, 0.0f, 0.0f));
+    lightColors.push_back(glm::vec3(0.0f, 0.0f, 0.2f));
+    lightColors.push_back(glm::vec3(0.0f, 0.1f, 0.0f));
 
     // finish
     // Configure global opengl state
@@ -329,10 +311,6 @@ int main()
 
     // setting uniforms that won't change in the render loop
     updateProjection();
-    shaderResult.use();
-    shaderResult.setInt("diffuseTexture", 0);
-    shaderResult.setInt("depthMap", 1);
-    std::vector<glm::mat4> shadowTransforms;
 
     while (!glfwWindowShouldClose(window))
     {
@@ -346,25 +324,48 @@ int main()
         view = camera.GetViewMatrix();
         glBufferSubData(GL_UNIFORM_BUFFER, sizeof(glm::mat4), sizeof(glm::mat4), glm::value_ptr(view));
         glBindBuffer(GL_UNIFORM_BUFFER, 0);
-        // Rendering
+
+        // Rendering - render to HDR framebuffer
+        glBindFramebuffer(GL_FRAMEBUFFER, framebufferHDR);
         glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        // render
-        shaderParallaxMapping.use();
-        model = glm::mat4(1.0f);
-        model = glm::rotate(model, glm::radians(rotationSpeed * (float)glfwGetTime()), glm::normalize(glm::vec3(1.0f, 0.0f, 1.0f)));
-        shaderParallaxMapping.setMat4("model", model);
-        shaderParallaxMapping.setVec3("lightPos", lightPos);
-        shaderParallaxMapping.setVec3("viewPos", camera.Position);
-        shaderParallaxMapping.setFloat("shininess", shininess);
-        shaderParallaxMapping.setFloat("heightScale", heightScale);
+        // Disable culling to render cube from inside
+        glDisable(GL_CULL_FACE);
+
+        shaderLightingScene.use();
         glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, diffuseMap);
-        glActiveTexture(GL_TEXTURE1);
-        glBindTexture(GL_TEXTURE_2D, normalMap);
-        glActiveTexture(GL_TEXTURE2);
-        glBindTexture(GL_TEXTURE_2D, displacementMap);
+        glBindTexture(GL_TEXTURE_2D, woodTexture);
+
+        // set lighting
+        for (unsigned int i = 0; i < lightPositions.size(); i++)
+        {
+            shaderLightingScene.setVec3("lights[" + std::to_string(i) + "].Position", lightPositions[i]);
+            shaderLightingScene.setVec3("lights[" + std::to_string(i) + "].Color", lightColors[i]);
+        }
+        shaderLightingScene.setVec3("viewPos", camera.Position);
+
+        // render tunnel
+        model = glm::mat4(1.0f);
+        model = glm::translate(model, glm::vec3(0.0f, 0.0f, 25.0f));
+        model = glm::scale(model, glm::vec3(2.5f, 2.5f, 27.5f));
+        shaderLightingScene.setMat4("model", model);
+        shaderLightingScene.setInt("inverse_normals", true);
+        renderCube();
+
+        // Re-enable culling for later rendering
+        glEnable(GL_CULL_FACE);
+
+        // Now render the HDR framebuffer to screen
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        glClearColor(0.2f, 0.2f, 0.2f, 1.0f);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+        shaderHDRToneMapping.use();
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, colorBufferHDR);
+        shaderHDRToneMapping.setInt("hdr", hdrEnabled);
+        shaderHDRToneMapping.setFloat("exposure", exposure);
         renderQuad();
 
         // new frame for imgui
@@ -377,7 +378,7 @@ int main()
         // (Your code clears your framebuffer, renders your other stuff etc.)
         imgui_frame_render();
         // (Your code calls glfwSwapBuffers() etc.)
-        faceCullingEnabled ? (GL_CULL_FACE) : glDisable(GL_CULL_FACE);
+        faceCullingEnabled ? glEnable(GL_CULL_FACE) : glDisable(GL_CULL_FACE);
         glfwSwapBuffers(window);
         glfwPollEvents();
     }
@@ -515,81 +516,41 @@ void renderQuad()
     if (quadVAO == 0)
     {
         // positions
-        glm::vec3 pos1(-1.0f, 1.0f, 0.0f);
-        glm::vec3 pos2(-1.0f, -1.0f, 0.0f);
-        glm::vec3 pos3(1.0f, -1.0f, 0.0f);
-        glm::vec3 pos4(1.0f, 1.0f, 0.0f);
-        // texture coordinates
-        glm::vec2 uv1(0.0f, 1.0f);
-        glm::vec2 uv2(0.0f, 0.0f);
-        glm::vec2 uv3(1.0f, 0.0f);
-        glm::vec2 uv4(1.0f, 1.0f);
-        // normal vector
-        glm::vec3 nm(0.0f, 0.0f, 1.0f);
-        // calculate tangent/bitangent vectors of both triangles
-        glm::vec3 tangent1, bitangent1;
-        glm::vec3 tangent2, bitangent2;
-        // triangle 1
-        // ----------
-        glm::vec3 edge1 = pos2 - pos1;
-        glm::vec3 edge2 = pos3 - pos1;
-        glm::vec2 deltaUV1 = uv2 - uv1;
-        glm::vec2 deltaUV2 = uv3 - uv1;
-
-        float f = 1.0f / (deltaUV1.x * deltaUV2.y - deltaUV2.x * deltaUV1.y);
-
-        tangent1.x = f * (deltaUV2.y * edge1.x - deltaUV1.y * edge2.x);
-        tangent1.y = f * (deltaUV2.y * edge1.y - deltaUV1.y * edge2.y);
-        tangent1.z = f * (deltaUV2.y * edge1.z - deltaUV1.y * edge2.z);
-
-        bitangent1.x = f * (-deltaUV2.x * edge1.x + deltaUV1.x * edge2.x);
-        bitangent1.y = f * (-deltaUV2.x * edge1.y + deltaUV1.x * edge2.y);
-        bitangent1.z = f * (-deltaUV2.x * edge1.z + deltaUV1.x * edge2.z);
-
-        // triangle 2
-        // ----------
-        edge1 = pos3 - pos1;
-        edge2 = pos4 - pos1;
-        deltaUV1 = uv3 - uv1;
-        deltaUV2 = uv4 - uv1;
-
-        f = 1.0f / (deltaUV1.x * deltaUV2.y - deltaUV2.x * deltaUV1.y);
-
-        tangent2.x = f * (deltaUV2.y * edge1.x - deltaUV1.y * edge2.x);
-        tangent2.y = f * (deltaUV2.y * edge1.y - deltaUV1.y * edge2.y);
-        tangent2.z = f * (deltaUV2.y * edge1.z - deltaUV1.y * edge2.z);
-
-        bitangent2.x = f * (-deltaUV2.x * edge1.x + deltaUV1.x * edge2.x);
-        bitangent2.y = f * (-deltaUV2.x * edge1.y + deltaUV1.x * edge2.y);
-        bitangent2.z = f * (-deltaUV2.x * edge1.z + deltaUV1.x * edge2.z);
-
         float quadVertices[] = {
-            // positions            // normal         // texcoords  // tangent                          // bitangent
-            pos1.x, pos1.y, pos1.z, nm.x, nm.y, nm.z, uv1.x, uv1.y, tangent1.x, tangent1.y, tangent1.z, bitangent1.x, bitangent1.y, bitangent1.z,
-            pos2.x, pos2.y, pos2.z, nm.x, nm.y, nm.z, uv2.x, uv2.y, tangent1.x, tangent1.y, tangent1.z, bitangent1.x, bitangent1.y, bitangent1.z,
-            pos3.x, pos3.y, pos3.z, nm.x, nm.y, nm.z, uv3.x, uv3.y, tangent1.x, tangent1.y, tangent1.z, bitangent1.x, bitangent1.y, bitangent1.z,
-
-            pos1.x, pos1.y, pos1.z, nm.x, nm.y, nm.z, uv1.x, uv1.y, tangent2.x, tangent2.y, tangent2.z, bitangent2.x, bitangent2.y, bitangent2.z,
-            pos3.x, pos3.y, pos3.z, nm.x, nm.y, nm.z, uv3.x, uv3.y, tangent2.x, tangent2.y, tangent2.z, bitangent2.x, bitangent2.y, bitangent2.z,
-            pos4.x, pos4.y, pos4.z, nm.x, nm.y, nm.z, uv4.x, uv4.y, tangent2.x, tangent2.y, tangent2.z, bitangent2.x, bitangent2.y, bitangent2.z};
+            // positions        // texture Coords
+            -1.0f,
+            1.0f,
+            0.0f,
+            0.0f,
+            1.0f,
+            -1.0f,
+            -1.0f,
+            0.0f,
+            0.0f,
+            0.0f,
+            1.0f,
+            1.0f,
+            0.0f,
+            1.0f,
+            1.0f,
+            1.0f,
+            -1.0f,
+            0.0f,
+            1.0f,
+            0.0f,
+        };
         glGenVertexArrays(1, &quadVAO);
         glGenBuffers(1, &quadVBO);
         glBindVertexArray(quadVAO);
         glBindBuffer(GL_ARRAY_BUFFER, quadVBO);
         glBufferData(GL_ARRAY_BUFFER, sizeof(quadVertices), &quadVertices, GL_STATIC_DRAW);
         glEnableVertexAttribArray(0);
-        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 14 * sizeof(float), (void *)0);
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void *)0);
         glEnableVertexAttribArray(1);
-        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 14 * sizeof(float), (void *)(3 * sizeof(float)));
-        glEnableVertexAttribArray(2);
-        glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 14 * sizeof(float), (void *)(6 * sizeof(float)));
-        glEnableVertexAttribArray(3);
-        glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, 14 * sizeof(float), (void *)(8 * sizeof(float)));
-        glEnableVertexAttribArray(4);
-        glVertexAttribPointer(4, 3, GL_FLOAT, GL_FALSE, 14 * sizeof(float), (void *)(11 * sizeof(float)));
+        glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void *)(3 * sizeof(float)));
     }
     glBindVertexArray(quadVAO);
-    glDrawArrays(GL_TRIANGLES, 0, 6);
+    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
     glBindVertexArray(0);
 }
 
@@ -600,23 +561,18 @@ void framebuffer_size_callback([[maybe_unused]] GLFWwindow *window, int width, i
     updateProjection();
     glViewport(0, 0, screen_width, screen_height);
     // Volvemos a configurar las texturas y el framebuffer para el nuevo tamaño
-    glBindFramebuffer(GL_FRAMEBUFFER, framebufferMSSA);
+    glBindFramebuffer(GL_FRAMEBUFFER, framebufferHDR);
+    // glViewport(0, 0, screen_width, screen_height);
 
     // Actualizar la textura color buffer asociada al framebuffer de MSAA
-    glBindTexture(GL_TEXTURE_2D_MULTISAMPLE, textureColorBufferMSSA);
-    glTexImage2DMultisample(GL_TEXTURE_2D_MULTISAMPLE, 4, GL_RGB, screen_width, screen_height, GL_TRUE);
-
+    glBindTexture(GL_TEXTURE_2D, colorBufferHDR);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, screen_width, screen_height, 0, GL_RGBA, GL_FLOAT, NULL);
     // Actualizamos el renderbuffer de profundidad y stencil
-    glBindRenderbuffer(GL_RENDERBUFFER, rboMSSA);
-    glRenderbufferStorageMultisample(GL_RENDERBUFFER, 4, GL_DEPTH24_STENCIL8, screen_width, screen_height);
+    glBindRenderbuffer(GL_RENDERBUFFER, rboDepthHDR);
+    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, screen_width, screen_height);
 
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
-    // Actualizamos la textura del framebuffer intermedio
-    glBindFramebuffer(GL_FRAMEBUFFER, intermediateFBO);
-    glBindTexture(GL_TEXTURE_2D, screenTexture);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, screen_width, screen_height, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
 void mouse_callback([[maybe_unused]] GLFWwindow *window, double xpos, double ypos)
@@ -806,8 +762,9 @@ void imgui_frame_update()
     if (ImGui::CollapsingHeader("Result"))
     {
         ImGui::Checkbox("Gamma Correction", &gammaEnabled);
-        ImGui::Checkbox("Texture Gamma Correction", &textureGammaCorrected);
         ImGui::SliderFloat("Gamma Factor", &gammaFactor, 1.0f, 5.0f);
+        ImGui::Checkbox("HDR Toggle", &hdrEnabled);
+        ImGui::SliderFloat("Exposure value", &exposure, 0.0f, 20.0f);
         ImGui::Checkbox("Back-Face Culling ", &faceCullingEnabled);
     }
     ImGui::Text("Light properties:");
