@@ -97,7 +97,7 @@ unsigned int uboMatrices;
 unsigned int screenTexture;
 bool gammaEnabled = false;
 bool textureGammaCorrected = false;
-bool hdrEnabled = false;
+int hdrMode = 0;
 float exposure = 1.0f;
 float gammaFactor = 2.2f;
 //////////////////
@@ -363,7 +363,7 @@ int main()
         shaderHDRToneMapping.use();
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, colorBufferHDR);
-        shaderHDRToneMapping.setInt("hdrEnabled", hdrEnabled);
+        shaderHDRToneMapping.setInt("hdrMode", hdrMode);
         shaderHDRToneMapping.setInt("gammaEnabled", gammaEnabled);
         shaderHDRToneMapping.setFloat("exposure", exposure);
         shaderHDRToneMapping.setFloat("gammaFactor", gammaFactor);
@@ -763,7 +763,8 @@ void imgui_frame_update()
     {
         ImGui::Checkbox("Gamma Correction", &gammaEnabled);
         ImGui::SliderFloat("Gamma Factor", &gammaFactor, 1.0f, 5.0f);
-        ImGui::Checkbox("HDR Toggle", &hdrEnabled);
+        const char* items[] = {"Disabled", "Reinhard Tone Mapping", "Exposure Tone Mapping"};
+        ImGui::Combo("Tone Mapping algorithm", &hdrMode, items, IM_COUNTOF(items));
         ImGui::SliderFloat("Exposure value", &exposure, 0.0f, 20.0f);
         ImGui::Checkbox("Back-Face Culling ", &faceCullingEnabled);
     }
