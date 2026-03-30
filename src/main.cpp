@@ -242,7 +242,6 @@ int main()
     glBindBuffer(GL_UNIFORM_BUFFER, 0);
 
     glBindBufferRange(GL_UNIFORM_BUFFER, 0, uboMatrices, 0, 2 * sizeof(glm::mat4));
-
     // framebuffer for HDR
     glGenFramebuffers(1, &framebufferHDR);
     // color buffer for hdr
@@ -364,8 +363,10 @@ int main()
         shaderHDRToneMapping.use();
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, colorBufferHDR);
-        shaderHDRToneMapping.setInt("hdr", hdrEnabled);
+        shaderHDRToneMapping.setInt("hdrEnabled", hdrEnabled);
+        shaderHDRToneMapping.setInt("gammaEnabled", gammaEnabled);
         shaderHDRToneMapping.setFloat("exposure", exposure);
+        shaderHDRToneMapping.setFloat("gammaFactor", gammaFactor);
         renderQuad();
 
         // new frame for imgui
@@ -572,7 +573,6 @@ void framebuffer_size_callback([[maybe_unused]] GLFWwindow *window, int width, i
     glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, screen_width, screen_height);
 
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
 }
 
 void mouse_callback([[maybe_unused]] GLFWwindow *window, double xpos, double ypos)
@@ -767,19 +767,21 @@ void imgui_frame_update()
         ImGui::SliderFloat("Exposure value", &exposure, 0.0f, 20.0f);
         ImGui::Checkbox("Back-Face Culling ", &faceCullingEnabled);
     }
-    ImGui::Text("Light properties:");
-    ImGui::SliderFloat3("Light position", (float *)&lightPos, -20.0f, 20.0f);
-    ImGui::SliderFloat3("Light direction", (float *)&lightDirection, -1.0f, 1.0f);
-    ImGui::ColorEdit3("Light ambient", (float *)&lightAmbient);
-    ImGui::ColorEdit3("Light diffuse", (float *)&lightDiffuse);
-    ImGui::ColorEdit3("Light specular", (float *)&lightSpecular);
-    ImGui::SliderFloat("Shininess", &shininess, 0.1f, 512.0f);
-    ImGui::SliderFloat("Height Scale", &heightScale, 0.0f, 2.0f);
-    ImGui::SliderFloat("Flashlight Inner cutoff", &flashlightInnerCutoff, 0.0f, 360.0f);
-    ImGui::SliderFloat("Flashlight Outer cutoff", &flashlightOuterCutoff, 0.0f, 360.0f);
-    ImGui::InputFloat("Light constant", &lightConstant);
-    ImGui::InputFloat("Light linear", &lightLinear);
-    ImGui::InputFloat("Light quadratic", &lightQuadratic);
+    if (ImGui::CollapsingHeader("Light properties"))
+    {
+        ImGui::SliderFloat3("Light position", (float *)&lightPos, -20.0f, 20.0f);
+        ImGui::SliderFloat3("Light direction", (float *)&lightDirection, -1.0f, 1.0f);
+        ImGui::ColorEdit3("Light ambient", (float *)&lightAmbient);
+        ImGui::ColorEdit3("Light diffuse", (float *)&lightDiffuse);
+        ImGui::ColorEdit3("Light specular", (float *)&lightSpecular);
+        ImGui::SliderFloat("Shininess", &shininess, 0.1f, 512.0f);
+        ImGui::SliderFloat("Height Scale", &heightScale, 0.0f, 2.0f);
+        ImGui::SliderFloat("Flashlight Inner cutoff", &flashlightInnerCutoff, 0.0f, 360.0f);
+        ImGui::SliderFloat("Flashlight Outer cutoff", &flashlightOuterCutoff, 0.0f, 360.0f);
+        ImGui::InputFloat("Light constant", &lightConstant);
+        ImGui::InputFloat("Light linear", &lightLinear);
+        ImGui::InputFloat("Light quadratic", &lightQuadratic);
+    }
     ImGui::End();
 }
 
