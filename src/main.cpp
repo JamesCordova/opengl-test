@@ -226,7 +226,7 @@ int main()
     shaderParallaxMapping.setInt("diffuseMap", 0);
     shaderParallaxMapping.setInt("normalMap", 1);
     shaderParallaxMapping.setInt("depthMap", 2);
-    
+
     // UBO's
     // unsigned int uboMatrices;
     glGenBuffers(1, &uboMatrices);
@@ -296,7 +296,7 @@ int main()
         std::cout << "ERROR::FRAMEBUFFER:: Intermediate framebuffer is not complete!" << std::endl;
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     // depth framebuffer for visualizing depth map
-   
+
     // finish
     // Configure global opengl state
     glEnable(GL_DEPTH_TEST);
@@ -515,14 +515,14 @@ void renderQuad()
     if (quadVAO == 0)
     {
         // positions
-        glm::vec3 pos1(-1.0f,  1.0f, 0.0f);
+        glm::vec3 pos1(-1.0f, 1.0f, 0.0f);
         glm::vec3 pos2(-1.0f, -1.0f, 0.0f);
-        glm::vec3 pos3( 1.0f, -1.0f, 0.0f);
-        glm::vec3 pos4( 1.0f,  1.0f, 0.0f);
+        glm::vec3 pos3(1.0f, -1.0f, 0.0f);
+        glm::vec3 pos4(1.0f, 1.0f, 0.0f);
         // texture coordinates
         glm::vec2 uv1(0.0f, 1.0f);
         glm::vec2 uv2(0.0f, 0.0f);
-        glm::vec2 uv3(1.0f, 0.0f);  
+        glm::vec2 uv3(1.0f, 0.0f);
         glm::vec2 uv4(1.0f, 1.0f);
         // normal vector
         glm::vec3 nm(0.0f, 0.0f, 1.0f);
@@ -571,8 +571,7 @@ void renderQuad()
 
             pos1.x, pos1.y, pos1.z, nm.x, nm.y, nm.z, uv1.x, uv1.y, tangent2.x, tangent2.y, tangent2.z, bitangent2.x, bitangent2.y, bitangent2.z,
             pos3.x, pos3.y, pos3.z, nm.x, nm.y, nm.z, uv3.x, uv3.y, tangent2.x, tangent2.y, tangent2.z, bitangent2.x, bitangent2.y, bitangent2.z,
-            pos4.x, pos4.y, pos4.z, nm.x, nm.y, nm.z, uv4.x, uv4.y, tangent2.x, tangent2.y, tangent2.z, bitangent2.x, bitangent2.y, bitangent2.z
-        };
+            pos4.x, pos4.y, pos4.z, nm.x, nm.y, nm.z, uv4.x, uv4.y, tangent2.x, tangent2.y, tangent2.z, bitangent2.x, bitangent2.y, bitangent2.z};
         glGenVertexArrays(1, &quadVAO);
         glGenBuffers(1, &quadVBO);
         glBindVertexArray(quadVAO);
@@ -804,11 +803,14 @@ void imgui_frame_update()
     ImGui::SliderFloat("Camera Speed", &camera.MovementSpeed, 0.0f, 250.0f);
     ImGui::SliderFloat("Mouse Sensitivity", &camera.MouseSensitivity, 0.0f, 1.0f);
     ImGui::ColorEdit3("Framebuffer Color", (float *)&framebufferColor);
+    if (ImGui::CollapsingHeader("Result"))
+    {
+        ImGui::Checkbox("Gamma Correction", &gammaEnabled);
+        ImGui::Checkbox("Texture Gamma Correction", &textureGammaCorrected);
+        ImGui::SliderFloat("Gamma Factor", &gammaFactor, 1.0f, 5.0f);
+        ImGui::Checkbox("Back-Face Culling ", &faceCullingEnabled);
+    }
     ImGui::Text("Light properties:");
-    ImGui::Checkbox("Gamma Correction", &gammaEnabled);
-    ImGui::Checkbox("Texture Gamma Correction", &textureGammaCorrected);
-    ImGui::Checkbox("Back-Face Culling ", &faceCullingEnabled);
-    ImGui::SliderFloat("Gamma Factor", &gammaFactor, 1.0f, 5.0f);
     ImGui::SliderFloat3("Light position", (float *)&lightPos, -20.0f, 20.0f);
     ImGui::SliderFloat3("Light direction", (float *)&lightDirection, -1.0f, 1.0f);
     ImGui::ColorEdit3("Light ambient", (float *)&lightAmbient);
