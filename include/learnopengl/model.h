@@ -3,12 +3,13 @@
 
 #include "learnopengl/mesh.h"
 
-#include <assimp/scene.h>
-// struct aiNode;
-// struct aiMesh;
-// struct aiMaterial;
-// struct aiScene;
+// #include <assimp/scene.h>
+struct aiNode;
+struct aiMesh;
+struct aiMaterial;
+struct aiScene;
 // enum aiTextureType;
+#include <assimp/material.h>
 
 unsigned int TextureFromFile(const char *path, const std::string &directory);
 
