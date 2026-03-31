@@ -40,7 +40,9 @@ FetchContent_Declare(
     GIT_SHALLOW     TRUE
     SOURCE_DIR      ${CMAKE_CURRENT_SOURCE_DIR}/assimp
 )
-
+if (MSVC)
+    set(ASSIMP_BUILD_USE_CCACHE OFF CACHE BOOL "" FORCE) # default to ON: conflict with rc
+endif()
 FetchContent_MakeAvailable(assimp)
 
 add_subdirectory(imgui-cmake) # Needs building
