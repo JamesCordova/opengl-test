@@ -147,7 +147,7 @@ int main()
     // Imgui setup
     imgui_frame_init(window);
 
-    float quadVertices[] = {
+    [[maybe_unused]]float quadVertices[] = {
         // positions   // texCoords
         -1.0f, 1.0f, 0.0f, 1.0f,
         -1.0f, -1.0f, 0.0f, 0.0f,
@@ -157,7 +157,7 @@ int main()
         1.0f, -1.0f, 1.0f, 0.0f,
         1.0f, 1.0f, 1.0f, 1.0f};
 
-    float skyboxVertices[] = {
+    [[maybe_unused]]float skyboxVertices[] = {
         // positions
         -1.0f, 1.0f, -1.0f,
         -1.0f, -1.0f, -1.0f,
@@ -201,7 +201,7 @@ int main()
         -1.0f, -1.0f, 1.0f,
         1.0f, -1.0f, 1.0f};
 
-    float planeVertices[] = {
+    [[maybe_unused]]float planeVertices[] = {
         // positions            // normals         // texcoords
         25.0f, -0.5f, 25.0f, 0.0f, 1.0f, 0.0f, 25.0f, 0.0f,
         -25.0f, -0.5f, -25.0f, 0.0f, 1.0f, 0.0f, 0.0f, 25.0f,
