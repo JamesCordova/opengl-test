@@ -4,29 +4,29 @@
 #include <glm/gtc/matrix_transform.hpp>
 
 Camera::Camera(glm::vec3 position, glm::vec3 up, float yaw, float pitch)
-    : Front(glm::vec3(0.0f, 0.0f, -1.0f)),
-      MovementSpeed(SPEED),
-      MouseSensitivity(SENSITIVITY),
-      Zoom(ZOOM),
-      Position(position),
+    : Position(position),
+      Front(glm::vec3(0.0f, 0.0f, -1.0f)),
       HorizontalFront(glm::vec3(0.0f, 0.0f, -1.0f)),
       WorldUp(up),
       Yaw(yaw),
-      Pitch(pitch)
+      Pitch(pitch),
+      MovementSpeed(SPEED),
+      MouseSensitivity(SENSITIVITY),
+      Zoom(ZOOM)
 {
     updateCameraVectors();
 }
 
 Camera::Camera(float posX, float posY, float posZ, float upX, float upY, float upZ, float yaw, float pitch)
-    : Front(glm::vec3(0.0f, 0.0f, -1.0f)),
-      MovementSpeed(SPEED),
-      MouseSensitivity(SENSITIVITY),
-      Zoom(ZOOM),
-      Position(glm::vec3(posX, posY, posZ)),
+    : Position(glm::vec3(posX, posY, posZ)),
+      Front(glm::vec3(0.0f, 0.0f, -1.0f)),
       HorizontalFront(glm::vec3(0.0f, 0.0f, -1.0f)),
       WorldUp(glm::vec3(upX, upY, upZ)),
       Yaw(yaw),
-      Pitch(pitch)
+      Pitch(pitch),
+      MovementSpeed(SPEED),
+      MouseSensitivity(SENSITIVITY),
+      Zoom(ZOOM),
 {
     updateCameraVectors();
 }
@@ -70,7 +70,7 @@ void Camera::ProcessMouseMovement(float xoffset, float yoffset, bool constrainPi
     }
     if (Yaw > 360.0f)
         Yaw = 0.0f;
-    
+
     updateCameraVectors();
 }
 
