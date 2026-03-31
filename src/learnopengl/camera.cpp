@@ -26,7 +26,7 @@ Camera::Camera(float posX, float posY, float posZ, float upX, float upY, float u
       Pitch(pitch),
       MovementSpeed(SPEED),
       MouseSensitivity(SENSITIVITY),
-      Zoom(ZOOM),
+      Zoom(ZOOM)
 {
     updateCameraVectors();
 }
