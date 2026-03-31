@@ -24,9 +24,11 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
 )
 
 if(MSVC)
-  target_compile_options(${PROJECT_NAME} PRIVATE /W4 /WX /permissive-)
+  # /w44365 (signed/unsigned errors) and /external:W3 dont work well
+  # Cmake makes hard to mark libs as external, it's fixable but not worth it 
+  target_compile_options(${PROJECT_NAME} PRIVATE /W4 /WX /permissive- /Zc:__cplusplus)
 else()
-  target_compile_options(${PROJECT_NAME} PRIVATE -Wall -Wextra -Wpedantic -Werror)
+  target_compile_options(${PROJECT_NAME} PRIVATE -Wall -Wextra -Wpedantic -Werror -Wno-delete-incomplete)
 endif()
 
 set(ASSETS_SOURCE_DIR "${CMAKE_SOURCE_DIR}/assets")
