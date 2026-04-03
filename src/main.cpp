@@ -384,7 +384,7 @@ int main()
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_STENCIL_TEST);
     // glDepthMask(GL_FALSE);
-    glDepthFunc(GL_LESS); // change depth function so depth test passes when values are equal to depth buffer's content
+    glDepthFunc(GL_LEQUAL); // change depth function so depth test passes when values are equal to depth buffer's content
     // blending
     // glEnable(GL_BLEND);
     // glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
@@ -470,6 +470,14 @@ int main()
         shaderLightingPass.setFloat("shininess", shininess);
         renderQuad();
 
+        glBindFramebuffer(GL_READ_FRAMEBUFFER, gBufferFBO);
+        glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0); // write to default framebuffer
+        // blit to default framebuffer. Note that this may or may not work as the internal formats of both the FBO and default framebuffer have to match.
+        // the internal formats are implementation defined. This works on all of my systems, but if it doesn't on yours you'll likely have to write to the
+        // depth buffer in another shader stage (or somehow see to match the default framebuffer's internal format with the FBO's internal format).
+        glBlitFramebuffer(0, 0, screen_width, screen_height, 0, 0, screen_width, screen_height, GL_DEPTH_BUFFER_BIT, GL_NEAREST);
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
         // render with forward rendering
         shaderLightCubeSources.use();
         for (unsigned int i = 0; i < lightPositions.size(); i++)
@@ -505,6 +513,9 @@ int main()
 
 void updateProjection()
 {
+    // Restrict if the window gets minimized
+    if (screen_height == 0) return;
+    
     glBindBuffer(GL_UNIFORM_BUFFER, uboMatrices);
     float ratio = static_cast<float>(screen_width) / static_cast<float>(screen_height);
     glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), ratio, 0.1f, 100.0f);
@@ -670,6 +681,9 @@ void renderQuad()
 
 void framebuffer_size_callback([[maybe_unused]] GLFWwindow *window, int width, int height)
 {
+    // restrict if the window gets minimized
+    if (width == 0 || height == 0) return;
+
     screen_width = width;
     screen_height = height;
     updateProjection();
