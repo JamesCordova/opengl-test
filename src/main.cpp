@@ -98,6 +98,7 @@ unsigned int screenTexture;
 bool textureGammaCorrected = false;
 int hdrMode = 0;
 int bloomType = 0;
+int bloomIterations = 10;
 float exposure = 1.0f;
 float gammaFactor = 2.2f;
 //////////////////
@@ -426,9 +427,8 @@ int main()
         }
         // blur process
         bool horizontal = true, first_iteration = true;
-        int amount = 10;
         shaderBlur.use();
-        for (int i = 0; i < amount; i++)
+        for (int i = 0; i < bloomIterations; i++)
         {
             glBindFramebuffer(GL_FRAMEBUFFER, pingPongFBO[horizontal]);
             shaderBlur.setInt("horizontal", horizontal);
@@ -871,6 +871,7 @@ void imgui_frame_update()
         ImGui::SliderFloat("Exposure value", &exposure, 0.0f, 20.0f);
         const char *bloomOptions[] = {"Disabled", "Blurred threshold"};
         ImGui::Combo("Bloom type", &bloomType, bloomOptions, IM_COUNTOF(bloomOptions));
+        ImGui::SliderInt("Bloom iterations", &bloomIterations, 1, 100);
         ImGui::Checkbox("Back-Face Culling ", &faceCullingEnabled);
     }
     if (ImGui::CollapsingHeader("Light properties"))
