@@ -104,6 +104,10 @@ float gammaFactor = 2.2f;
 unsigned int framebufferHDR;
 unsigned int colorBufferHDR[2];
 unsigned int rboDepthHDR;
+/////
+unsigned int pingPongFBO[2];
+unsigned int pingPongBuffer[2];
+////
 //////////////////
 unsigned int planeVAO;
 
@@ -222,6 +226,7 @@ int main()
     // Implementation
     Shader shaderLightingScene("assets/shaders/bloomLightingScene.vert", "assets/shaders/bloomLightingScene.frag");
     Shader shaderLightSource("assets/shaders/bloomLightSource.vert", "assets/shaders/bloomLightSource.frag");
+    Shader shaderBlur("assets/shaders/bloomBlurPingPong.vert", "assets/shaders/bloomBlurPingPong.frag");
     Shader shaderHDRToneMapping("assets/shaders/hdrQuadToneMapped.vert", "assets/shaders/hdrQuadToneMapped.frag");
 
     // Configure shader for debug quad
@@ -277,12 +282,31 @@ int main()
     if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
         std::cout << "Framebuffer not complete\n";
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+    // another buffer for ping pong blur
+    glGenFramebuffers(2, pingPongFBO);
+    glGenTextures(2, pingPongBuffer);
+    for (unsigned int i = 0; i < 2; i++)
+    {
+        glBindFramebuffer(GL_FRAMEBUFFER, pingPongFBO[i]);
+        glBindTexture(GL_TEXTURE_2D, pingPongBuffer[i]);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, screen_width, screen_height, 0, GL_RGBA, GL_FLOAT, NULL);
+        // filtering
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        // wrapping
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        // attach
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, pingPongBuffer[i], 0);
+    }
+
     // positions
     std::vector<glm::vec3> lightPositions;
     lightPositions.push_back(glm::vec3(0.0f, 0.5f, 1.5f)); // back light
     lightPositions.push_back(glm::vec3(-4.0f, 0.5f, -3.0f));
     lightPositions.push_back(glm::vec3(3.0f, 0.5f, 1.0f));
-    lightPositions.push_back(glm::vec3(-0.8f, -2.4f, -1.0f));
+    lightPositions.push_back(glm::vec3(-0.8f, 2.4f, -1.0f));
     // colors
     std::vector<glm::vec3> lightColors;
     lightColors.push_back(glm::vec3(5.0f, 5.0f, 5.0f));
@@ -400,6 +424,22 @@ int main()
             shaderLightSource.setVec3("lightColor", lightColors[i]);
             renderCube();
         }
+        // blur process
+        bool horizontal = true, first_iteration = true;
+        int amount = 10;
+        shaderBlur.use();
+        for (int i = 0; i < amount; i++)
+        {
+            glBindFramebuffer(GL_FRAMEBUFFER, pingPongFBO[horizontal]);
+            shaderBlur.setInt("horizontal", horizontal);
+            glBindTexture(GL_TEXTURE_2D, first_iteration ? colorBufferHDR[1] : pingPongBuffer[!horizontal]);
+            renderQuad();
+            horizontal = !horizontal;
+            if (first_iteration)
+                first_iteration = false;
+        }
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
         // Re-enable culling for later rendering
         glEnable(GL_CULL_FACE);
 
@@ -623,6 +663,22 @@ void framebuffer_size_callback([[maybe_unused]] GLFWwindow *window, int width, i
     // Actualizamos el renderbuffer de profundidad y stencil
     glBindRenderbuffer(GL_RENDERBUFFER, rboDepthHDR);
     glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, screen_width, screen_height);
+
+    // the blur framebuffers
+    // for (unsigned int i = 0; i < 2; i++)
+    // {
+    //     glBindFramebuffer(GL_FRAMEBUFFER, pingPongFBO[i]);
+    //     glBindTexture(GL_TEXTURE_2D, pingPongBuffer[i]);
+    //     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, screen_width, screen_height, 0, GL_RGBA, GL_FLOAT, NULL);
+    //     // filtering
+    //     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    //     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    //     // wrapping
+    //     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    //     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    //     // attach
+    //     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, pingPongBuffer[i], 0);
+    // }
 
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
