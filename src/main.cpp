@@ -225,9 +225,9 @@ int main()
     stbi_set_flip_vertically_on_load(true);
     Model backpackModel("assets/objects/backpack/backpack.obj");
     // Implementation
-    Shader shaderGBufferPass("assets/shaders/gBufferScene.vert", "assets/shaders/gBufferScene.frag");
+    Shader shaderGBufferPass("assets/shaders/deferredShadingGBufferScene.vert", "assets/shaders/deferredShadingGBufferScene.frag");
     Shader shaderLightingPass("assets/shaders/deferredShadindLightingPass.vert", "assets/shaders/deferredShadindLightingPass.frag");
-    Shader shaderBlur("assets/shaders/bloomBlurPingPong.vert", "assets/shaders/bloomBlurPingPong.frag");
+    Shader shaderLightCubeSources("assets/shaders/deferredShadingForwardLightSources.vert", "assets/shaders/deferredShadingForwardLightSources.frag");
     Shader shaderPostprocess("assets/shaders/bloomQuadToneBloom.vert", "assets/shaders/bloomQuadToneBloom.frag");
 
     // Configure shader for debug quad
@@ -470,6 +470,17 @@ int main()
         shaderLightingPass.setFloat("shininess", shininess);
         renderQuad();
 
+        // render with forward rendering
+        shaderLightCubeSources.use();
+        for (unsigned int i = 0; i < lightPositions.size(); i++)
+        {
+            model = glm::mat4(1.0f);
+            model = glm::translate(model, lightPositions[i]);
+            model = glm::scale(model, glm::vec3(0.25f));
+            shaderLightCubeSources.setMat4("model", model);
+            shaderLightCubeSources.setVec3("lightColor", lightColors[i]);
+            renderCube();
+        }
         // new frame for imgui
         imgui_frame_new();
 
