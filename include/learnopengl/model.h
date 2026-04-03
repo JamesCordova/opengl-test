@@ -20,7 +20,7 @@ public:
     // stores all the textures loaded so far, optimization to make sure textures aren't loaded more than once.
     std::vector<Texture> textures_loaded;
 
-    Model(char *path);
+    Model(const std::string &path);
     void Draw(Shader &shader);
 
 private:
