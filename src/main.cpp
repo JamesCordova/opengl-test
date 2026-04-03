@@ -106,7 +106,7 @@ unsigned int colorBufferHDR[2];
 unsigned int rboDepthHDR;
 /////
 unsigned int pingPongFBO[2];
-unsigned int pingPongBuffer[2];
+unsigned int pingPongColorBuffer[2];
 ////
 //////////////////
 unsigned int planeVAO;
@@ -227,7 +227,7 @@ int main()
     Shader shaderLightingScene("assets/shaders/bloomLightingScene.vert", "assets/shaders/bloomLightingScene.frag");
     Shader shaderLightSource("assets/shaders/bloomLightSource.vert", "assets/shaders/bloomLightSource.frag");
     Shader shaderBlur("assets/shaders/bloomBlurPingPong.vert", "assets/shaders/bloomBlurPingPong.frag");
-    Shader shaderHDRToneMapping("assets/shaders/hdrQuadToneMapped.vert", "assets/shaders/hdrQuadToneMapped.frag");
+    Shader shaderPostprocess("assets/shaders/bloomQuadToneBloom.vert", "assets/shaders/bloomQuadToneBloom.frag");
 
     // Configure shader for debug quad
     shaderLightingScene.use();
@@ -237,8 +237,8 @@ int main()
     GLuint matricesIndex = glGetUniformBlockIndex(shaderLightingScene.ID, "Matrices");
     glUniformBlockBinding(shaderLightingScene.ID, matricesIndex, 0);
 
-    shaderHDRToneMapping.use();
-    shaderHDRToneMapping.setInt("hdrBuffer", 0);
+    shaderPostprocess.use();
+    shaderPostprocess.setInt("hdrBuffer", 0);
 
     // UBO's
     // unsigned int uboMatrices;
@@ -285,11 +285,11 @@ int main()
 
     // another buffer for ping pong blur
     glGenFramebuffers(2, pingPongFBO);
-    glGenTextures(2, pingPongBuffer);
+    glGenTextures(2, pingPongColorBuffer);
     for (unsigned int i = 0; i < 2; i++)
     {
         glBindFramebuffer(GL_FRAMEBUFFER, pingPongFBO[i]);
-        glBindTexture(GL_TEXTURE_2D, pingPongBuffer[i]);
+        glBindTexture(GL_TEXTURE_2D, pingPongColorBuffer[i]);
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, screen_width, screen_height, 0, GL_RGBA, GL_FLOAT, NULL);
         // filtering
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
@@ -298,7 +298,7 @@ int main()
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
         // attach
-        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, pingPongBuffer[i], 0);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, pingPongColorBuffer[i], 0);
     }
 
     // positions
@@ -432,7 +432,7 @@ int main()
         {
             glBindFramebuffer(GL_FRAMEBUFFER, pingPongFBO[horizontal]);
             shaderBlur.setInt("horizontal", horizontal);
-            glBindTexture(GL_TEXTURE_2D, first_iteration ? colorBufferHDR[1] : pingPongBuffer[!horizontal]);
+            glBindTexture(GL_TEXTURE_2D, first_iteration ? colorBufferHDR[1] : pingPongColorBuffer[!horizontal]);
             renderQuad();
             horizontal = !horizontal;
             if (first_iteration)
@@ -448,13 +448,17 @@ int main()
         glClearColor(0.2f, 0.2f, 0.2f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-        shaderHDRToneMapping.use();
+        shaderPostprocess.use();
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, colorBufferHDR[0]);
-        shaderHDRToneMapping.setInt("hdrMode", hdrMode);
-        shaderHDRToneMapping.setInt("gammaEnabled", gammaEnabled);
-        shaderHDRToneMapping.setFloat("exposure", exposure);
-        shaderHDRToneMapping.setFloat("gammaFactor", gammaFactor);
+        glActiveTexture(GL_TEXTURE1);
+        glBindTexture(GL_TEXTURE_2D, pingPongColorBuffer[!horizontal]);
+        shaderPostprocess.setInt("bloomBlur", 1);
+        shaderPostprocess.setInt("hdrMode", hdrMode);
+        shaderPostprocess.setInt("gammaEnabled", gammaEnabled);
+        shaderPostprocess.setFloat("exposure", exposure);
+        shaderPostprocess.setFloat("gammaFactor", gammaFactor);
+        shaderPostprocess.setInt("bloomEnabled", bloomType);
         renderQuad();
 
         // new frame for imgui
@@ -664,21 +668,12 @@ void framebuffer_size_callback([[maybe_unused]] GLFWwindow *window, int width, i
     glBindRenderbuffer(GL_RENDERBUFFER, rboDepthHDR);
     glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, screen_width, screen_height);
 
-    // the blur framebuffers
-    // for (unsigned int i = 0; i < 2; i++)
-    // {
-    //     glBindFramebuffer(GL_FRAMEBUFFER, pingPongFBO[i]);
-    //     glBindTexture(GL_TEXTURE_2D, pingPongBuffer[i]);
-    //     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, screen_width, screen_height, 0, GL_RGBA, GL_FLOAT, NULL);
-    //     // filtering
-    //     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    //     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    //     // wrapping
-    //     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    //     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    //     // attach
-    //     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, pingPongBuffer[i], 0);
-    // }
+    // just resize the color framebuffers
+    for (unsigned int i = 0; i < 2; i++)
+    {
+        glBindTexture(GL_TEXTURE_2D, pingPongColorBuffer[i]);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, screen_width, screen_height, 0, GL_RGBA, GL_FLOAT, NULL);
+    }
 
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
@@ -873,9 +868,9 @@ void imgui_frame_update()
         ImGui::SliderFloat("Gamma Factor", &gammaFactor, 1.0f, 5.0f);
         const char *toneMappingOptions[] = {"Disabled", "Reinhard Tone Mapping", "Exposure Tone Mapping"};
         ImGui::Combo("Tone Mapping algorithm", &hdrMode, toneMappingOptions, IM_COUNTOF(toneMappingOptions));
-        const char *bloomOptions[] = {"Disabled", "Blurred threshold", "Downsampled threshold"};
-        ImGui::Combo("Bloom type", &bloomType, bloomOptions, IM_COUNTOF(bloomOptions));
         ImGui::SliderFloat("Exposure value", &exposure, 0.0f, 20.0f);
+        const char *bloomOptions[] = {"Disabled", "Blurred threshold"};
+        ImGui::Combo("Bloom type", &bloomType, bloomOptions, IM_COUNTOF(bloomOptions));
         ImGui::Checkbox("Back-Face Culling ", &faceCullingEnabled);
     }
     if (ImGui::CollapsingHeader("Light properties"))
