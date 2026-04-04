@@ -226,7 +226,7 @@ int main()
     Model backpackModel("assets/objects/backpack/backpack.obj");
     // Implementation
     Shader shaderGBufferPass("assets/shaders/deferredShadingGBufferScene.vert", "assets/shaders/deferredShadingGBufferScene.frag");
-    Shader shaderLightingPass("assets/shaders/deferredShadindLightingPass.vert", "assets/shaders/deferredShadindLightingPass.frag");
+    Shader shaderLightingPass("assets/shaders/deferredShadindLightingPassVolumes.vert", "assets/shaders/deferredShadindLightingPassVolumes.frag");
     Shader shaderLightCubeSources("assets/shaders/deferredShadingForwardLightSources.vert", "assets/shaders/deferredShadingForwardLightSources.frag");
     Shader shaderPostprocess("assets/shaders/bloomQuadToneBloom.vert", "assets/shaders/bloomQuadToneBloom.frag");
 
@@ -465,6 +465,11 @@ int main()
 
             shaderLightingPass.setFloat("lights[" + std::to_string(i) + "].Linear", lightLinear);
             shaderLightingPass.setFloat("lights[" + std::to_string(i) + "].Quadratic", lightQuadratic);
+            // calculate radius of light volumes
+            // this is the optimize way just theory, the real way is rendering spheres and backfacing it to enlighten fragments
+            const float maxBrightness = std::fmaxf(std::fmaxf(lightColors[i].r, lightColors[i].g), lightColors[i].b);
+            float radius = (-lightLinear + std::sqrt(lightLinear * lightLinear - 4 * lightQuadratic * (lightConstant - (256.0f / 5.0f) * maxBrightness))) / (2.0f * lightQuadratic);
+            shaderLightingPass.setFloat("lights[" + std::to_string(i) + "].Radius", radius);
         }
         shaderLightingPass.setVec3("viewPos", camera.Position);
         shaderLightingPass.setFloat("shininess", shininess);
