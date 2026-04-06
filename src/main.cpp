@@ -78,6 +78,7 @@ bool cursorEnabled = false;
 bool wireframeEnabled = false;
 bool faceCullingEnabled = true;
 bool gammaEnabled = true;
+bool ssaoEnabled = true;
 ////////////////
 // Temporary variables needed
 // animation
@@ -560,6 +561,8 @@ int main()
         // update attenuation
         shaderLightingPass.setFloat("light.Linear", lightLinear);
         shaderLightingPass.setFloat("light.Quadratic", lightQuadratic);
+        shaderLightingPass.setFloat("shininess", shininess);
+        shaderLightingPass.setInt("ssaoEnabled", ssaoEnabled);
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, gPosition);
         glActiveTexture(GL_TEXTURE1);
@@ -814,6 +817,7 @@ void scroll_callback([[maybe_unused]] GLFWwindow *window, [[maybe_unused]] doubl
     if (cursorEnabled)
         return;
     camera.ProcessMouseScroll(static_cast<float>(yoffset));
+    updateProjection();
 }
 
 void processInput(GLFWwindow *window)
@@ -988,6 +992,7 @@ void imgui_frame_update()
         const char *bloomOptions[] = {"Disabled", "Blurred threshold"};
         ImGui::Combo("Bloom type", &bloomType, bloomOptions, IM_COUNTOF(bloomOptions));
         ImGui::SliderInt("Bloom iterations", &bloomIterations, 1, 100);
+        ImGui::Checkbox("SSAO", &ssaoEnabled);
         ImGui::Checkbox("Back-Face Culling ", &faceCullingEnabled);
     }
     if (ImGui::CollapsingHeader("Light properties"))
