@@ -24,6 +24,7 @@ struct Light
 
 uniform Light light;
 uniform float shininess = 8.0;
+uniform bool ssaoEnabled;
 
 void main()
 {
@@ -34,7 +35,9 @@ void main()
     float AmbientOcclusion = texture(ssao, fs_in.TexCoords).r;
 
     // blinn phong
-    vec3 ambient = vec3(0.3 * Diffuse * AmbientOcclusion);
+    vec3 ambient = vec3(0.3 * Diffuse);
+    if (ssaoEnabled)
+        ambient *= AmbientOcclusion;
     vec3 lighting = ambient;
     vec3 viewDir = normalize(-FragPos);
     // diffuse
