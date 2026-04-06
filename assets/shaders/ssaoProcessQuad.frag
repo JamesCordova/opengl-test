@@ -19,6 +19,7 @@ uniform int height;
 uniform int kernelSize;
 uniform float radius;
 uniform float bias;
+uniform float occlusionPower;
 
 vec2 noiseScale = vec2(800.0 / 4.0, 600.0 / 4.0);
 
@@ -53,5 +54,5 @@ void main()
         occlusion += (sampleDepth >= samplePos.z + bias ? 1.0 : 0.0) * rangeCheck;
     }
     occlusion = 1.0 - (occlusion / kernelSize);
-    FragColor = occlusion;
+    FragColor = pow(occlusion, occlusionPower);
 }

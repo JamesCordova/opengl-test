@@ -69,9 +69,10 @@ float lastFrame = 0.0f; // time of last frame
 
 // util
 glm::mat4 projection;
-int kernelSize = 64;
+int kernelSize = 32;
 float hemisphereRadius = 0.5f;
 float ambientOcclusionBias = 0.025f;
+float occlusionPower = 1.0f;
 
 // Game state
 bool cursorEnabled = false;
@@ -540,6 +541,7 @@ int main()
         shaderSsao.setInt("kernelSize", kernelSize);
         shaderSsao.setFloat("radius", hemisphereRadius);
         shaderSsao.setFloat("bias", ambientOcclusionBias);
+        shaderSsao.setFloat("occlusionPower", occlusionPower);
         renderQuad();
 
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -1016,6 +1018,7 @@ void imgui_frame_update()
         ImGui::SliderInt("KernelSize", &kernelSize, 0, 64);
         ImGui::SliderFloat("Sphere radius", &hemisphereRadius, 0.0f, 2.0f);
         ImGui::SliderFloat("Bias", &ambientOcclusionBias, 0.0f, 0.05f, "%.6f");
+        ImGui::SliderFloat("Occlusion Power", &occlusionPower, 0.1f, 2.0f);
     }
     ImGui::End();
 }
