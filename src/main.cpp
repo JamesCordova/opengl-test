@@ -81,6 +81,7 @@ bool faceCullingEnabled = true;
 bool gammaEnabled = true;
 bool ssaoEnabled = true;
 bool useSimpleTangent = false;
+bool blurSsaoEnabled = true;
 ////////////////
 // Temporary variables needed
 // animation
@@ -124,6 +125,7 @@ unsigned int gRboDepth;
 unsigned int pingPongFBO[2];
 unsigned int pingPongColorBuffer[2];
 unsigned int ssaoColorBuffer;
+unsigned int ssaoBlurPassColorBuffer;
 ////
 //////////////////
 unsigned int planeVAO;
@@ -245,8 +247,7 @@ int main()
     Shader shaderGBufferPass("assets/shaders/ssaoGBufferWhiteScene.vert", "assets/shaders/ssaoGBufferWhiteScene.frag");
     Shader shaderSsao("assets/shaders/ssaoProcessQuad.vert", "assets/shaders/ssaoProcessQuad.frag");
     Shader shaderLightingPass("assets/shaders/ssaoLightingPass.vert", "assets/shaders/ssaoLightingPass.frag");
-    Shader shaderLightCubeSources("assets/shaders/deferredShadingForwardLightSources.vert", "assets/shaders/deferredShadingForwardLightSources.frag");
-    Shader shaderPostprocess("assets/shaders/bloomQuadToneBloom.vert", "assets/shaders/bloomQuadToneBloom.frag");
+    Shader shaderPostprocess("assets/shaders/ssaoProcessToBlur.vert", "assets/shaders/ssaoProcessToBlur.frag");
     Shader shaderRenderQuad("assets/shaders/framebuffersSimpleQuad.vert", "assets/shaders/framebuffersSimpleQuad.frag");
 
     // Configure shader for debug quad
@@ -270,7 +271,7 @@ int main()
     shaderLightingPass.setInt("ssao", 3);
 
     shaderPostprocess.use();
-    shaderPostprocess.setInt("hdrBuffer", 0);
+    shaderPostprocess.setInt("ssaoInput", 0);
 
     // UBO's
     // unsigned int uboMatrices;
@@ -390,6 +391,19 @@ int main()
         std::cout << "Framebuffer not complete\n";
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
+    unsigned int ssaoBlurPassFBO;
+    glGenFramebuffers(1, &ssaoBlurPassFBO);
+    glBindFramebuffer(GL_FRAMEBUFFER, ssaoBlurPassFBO);
+    glGenTextures(1, &ssaoBlurPassColorBuffer);
+    glBindTexture(GL_TEXTURE_2D, ssaoBlurPassColorBuffer);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, screen_width, screen_height, 0, GL_RED, GL_FLOAT, NULL);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, ssaoBlurPassColorBuffer, 0);
+    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+        std::cout << "Framebuffer not complete\n";
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
     // generate sample kernel
     std::uniform_real_distribution<float> randomFloats(0.0, 1.0);
     std::default_random_engine generator;
@@ -501,7 +515,7 @@ int main()
         glBufferSubData(GL_UNIFORM_BUFFER, sizeof(glm::mat4), sizeof(glm::mat4), glm::value_ptr(view));
         glBindBuffer(GL_UNIFORM_BUFFER, 0);
 
-        // Rendering - render to HDR framebuffer
+        // Rendering - render to G framebuffer
         glBindFramebuffer(GL_FRAMEBUFFER, gBufferFBO);
         glClearColor(0.01f, 0.01f, 0.2f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -511,7 +525,7 @@ int main()
 
         shaderGBufferPass.use();
 
-        // set lighting
+        // set object positions
         for (unsigned int i = 0; i < objectPositions.size(); i++)
         {
             model = glm::mat4(1.0f);
@@ -547,13 +561,19 @@ int main()
         renderQuad();
 
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
-        // glClearColor(1.0f, 0.0f, 0.0f, 1.0f);
-        // // lighting pass
-        // glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-        // glActiveTexture(GL_TEXTURE0);
-        // glBindTexture(GL_TEXTURE_2D, ssaoColorBuffer);
-        // shaderRenderQuad.use();
-        // renderQuad();
+        // blur pass
+        if (blurSsaoEnabled)
+        {
+            glBindFramebuffer(GL_FRAMEBUFFER, ssaoBlurPassFBO);
+            glClear(GL_COLOR_BUFFER_BIT);
+            glActiveTexture(GL_TEXTURE0);
+            glBindTexture(GL_TEXTURE_2D, ssaoColorBuffer);
+            shaderPostprocess.use();
+            renderQuad();
+        }
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+        // render quad aplying light pass
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
         
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -574,7 +594,7 @@ int main()
         glActiveTexture(GL_TEXTURE2);
         glBindTexture(GL_TEXTURE_2D, gAlbedoSpec);
         glActiveTexture(GL_TEXTURE3); // add extra SSAO texture to lighting pass
-        glBindTexture(GL_TEXTURE_2D, ssaoColorBuffer);        
+        glBindTexture(GL_TEXTURE_2D, blurSsaoEnabled ? ssaoBlurPassColorBuffer : ssaoColorBuffer);
         renderQuad();
 
         // new frame for imgui
@@ -796,6 +816,9 @@ void framebuffer_size_callback([[maybe_unused]] GLFWwindow *window, int width, i
     glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, screen_width, screen_height);
 
     glBindTexture(GL_TEXTURE_2D, ssaoColorBuffer);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, screen_width, screen_height, 0, GL_RED, GL_FLOAT, NULL);
+
+    glBindTexture(GL_TEXTURE_2D, ssaoBlurPassColorBuffer);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, screen_width, screen_height, 0, GL_RED, GL_FLOAT, NULL);
 }
 
@@ -1022,6 +1045,7 @@ void imgui_frame_update()
         ImGui::SliderFloat("Bias", &ambientOcclusionBias, 0.0f, 0.05f, "%.6f");
         ImGui::SliderFloat("Occlusion Power", &occlusionPower, 0.1f, 2.0f);
         ImGui::Checkbox("Simple Tangent(no noise)", &useSimpleTangent);
+        ImGui::Checkbox("Blur SSAO result", &blurSsaoEnabled);
     }
     ImGui::End();
 }
