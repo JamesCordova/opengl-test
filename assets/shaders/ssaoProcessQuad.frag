@@ -20,6 +20,7 @@ uniform int kernelSize;
 uniform float radius;
 uniform float bias;
 uniform float occlusionPower;
+uniform bool simpleTangent;
 
 vec2 noiseScale = vec2(800.0 / 4.0, 600.0 / 4.0);
 
@@ -30,7 +31,11 @@ void main()
     vec3 normal = normalize(texture(gNormal, fs_in.TexCoords).rgb);
     vec3 randomVec = normalize(texture(texNoise, fs_in.TexCoords * noiseScale).xyz);
 
-    vec3 proyected = normal * dot(randomVec, normal);
+    vec3 proyected;
+    if (simpleTangent) // when normal is 1,0,0 is almost not visible in screen
+        proyected = normal * dot(vec3(1.0, 0.0, 0.0), normal);
+    else
+        proyected = normal * dot(randomVec, normal);
     // we could change randomvec to change this
     vec3 tangent = normalize(randomVec - proyected);
     vec3 bitangent = cross(normal, tangent);

@@ -80,6 +80,7 @@ bool wireframeEnabled = false;
 bool faceCullingEnabled = true;
 bool gammaEnabled = true;
 bool ssaoEnabled = true;
+bool useSimpleTangent = false;
 ////////////////
 // Temporary variables needed
 // animation
@@ -542,6 +543,7 @@ int main()
         shaderSsao.setFloat("radius", hemisphereRadius);
         shaderSsao.setFloat("bias", ambientOcclusionBias);
         shaderSsao.setFloat("occlusionPower", occlusionPower);
+        shaderSsao.setFloat("simpleTangent", useSimpleTangent);
         renderQuad();
 
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -1019,6 +1021,7 @@ void imgui_frame_update()
         ImGui::SliderFloat("Sphere radius", &hemisphereRadius, 0.0f, 2.0f);
         ImGui::SliderFloat("Bias", &ambientOcclusionBias, 0.0f, 0.05f, "%.6f");
         ImGui::SliderFloat("Occlusion Power", &occlusionPower, 0.1f, 2.0f);
+        ImGui::Checkbox("Simple Tangent(no noise)", &useSimpleTangent);
     }
     ImGui::End();
 }
