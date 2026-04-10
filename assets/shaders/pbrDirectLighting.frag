@@ -64,7 +64,7 @@ void main()
         Lo             += brdf * radiance * NdotL;
     }
 
-    vec3 ambient = vec3(0.1) * albedo * ao;
+    vec3 ambient = vec3(0.01) * albedo * ao;
     vec3 color =  ambient + Lo;
     // tone mapping
     color = color / (color + vec3(1.0));
