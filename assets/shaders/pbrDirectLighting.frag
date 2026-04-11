@@ -44,11 +44,11 @@ void main()
         vec3 radiance   = lightColors[i] * attenuation;
 
         float NdotV = max(dot(N, V), 0.0);
-        float clamppedNdotV = clamp(dot(N, V), 0.0, 1.0);
+        float clamppedHdotV = clamp(dot(H, V), 0.0, 1.0);
 
         float D = DistributionGGX(N, H, roughness);
         float G = GeometrySmith(N, V, L, roughness);
-        vec3 F  = fresnelSchlick(clamppedNdotV, F0);
+        vec3 F  = fresnelSchlick(clamppedHdotV, F0);
 
         vec3 ks = F;
         vec3 kd = vec3(1.0) - ks;
