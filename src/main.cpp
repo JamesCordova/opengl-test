@@ -37,6 +37,7 @@ void updateProjection();
 void renderScene(Shader &shader);
 void renderCube();
 void renderQuad();
+void renderSphere();
 void mouse_callback(GLFWwindow *window, double xpos, double ypos);
 void scroll_callback(GLFWwindow *window, double xoffset, double yoffset);
 void processInput(GLFWwindow *window);
@@ -88,6 +89,12 @@ bool blurSsaoEnabled = true;
 float rotationSpeed = 50.0f; // degrees per second
 glm::vec3 mirrorCenterPos(0.0f, 0.5f, -4.5f);
 glm::vec3 cubeColor(1.0f, 0.5f, 0.31f);
+float mettalicValue = 0.0f;
+float roughnessValue = 0.0f;
+float aoValue = 1.0f;
+int nrRows = 7;
+int nrColumns = 7;
+float spacing = 2.5f;
 glm::vec3 framebufferColor(0.2f, 0.3f, 0.3f);
 // light things
 glm::vec3 lightPos(0.5f, 1.0f, 0.3f);
@@ -245,6 +252,7 @@ int main()
     Model backpackModel("assets/objects/backpack/backpack.obj");
     // Implementation
     Shader shaderGBufferPass("assets/shaders/ssaoGBufferWhiteScene.vert", "assets/shaders/ssaoGBufferWhiteScene.frag");
+    Shader shaderPBRDirectLighting("assets/shaders/pbrDirectLighting.vert", "assets/shaders/pbrDirectLighting.frag");
     Shader shaderSsao("assets/shaders/ssaoProcessQuad.vert", "assets/shaders/ssaoProcessQuad.frag");
     Shader shaderLightingPass("assets/shaders/ssaoLightingPass.vert", "assets/shaders/ssaoLightingPass.frag");
     Shader shaderPostprocess("assets/shaders/ssaoProcessToBlur.vert", "assets/shaders/ssaoProcessToBlur.frag");
@@ -450,24 +458,17 @@ int main()
     objectPositions.push_back(glm::vec3(3.0, -0.5, 3.0));
 
     // positions
-    const unsigned int NR_LIGHTS = 32;
-    std::vector<glm::vec3> lightPositions;
-    // colors
-    std::vector<glm::vec3> lightColors;
-    srand(13);
-    for (unsigned int i = 0; i < NR_LIGHTS; i++)
-    {
-        // calculate slightly random offsets
-        float xPos = static_cast<float>(((rand() % 100) / 100.0f) * 6.0 - 3.0f);
-        float yPos = static_cast<float>(((rand() % 100) / 100.0f) * 6.0 - 4.0f);
-        float zPos = static_cast<float>(((rand() % 100) / 100.0f) * 6.0 - 5.0f);
-        lightPositions.push_back(glm::vec3(xPos, yPos, zPos));
-        // random color
-        float rColor = static_cast<float>(((rand() % 100) / 200.0f) + 0.5f);
-        float gColor = static_cast<float>(((rand() % 100) / 200.0f) + 0.5f);
-        float bColor = static_cast<float>(((rand() % 100) / 200.0f) + 0.5f);
-        lightColors.push_back(glm::vec3(rColor, gColor, bColor));
-    }
+    glm::vec3 lightPositions[] = {
+        glm::vec3(-10.0f, 10.0f, 10.0f),
+        glm::vec3(10.0f, 10.0f, 10.0f),
+        glm::vec3(-10.0f, -10.0f, 10.0f),
+        glm::vec3(10.0f, -10.0f, 10.0f)};
+
+    glm::vec3 lightColors[] = {
+        glm::vec3(300.0f, 300.0f, 300.0f),
+        glm::vec3(300.0f, 300.0f, 300.0f),
+        glm::vec3(300.0f, 300.0f, 300.0f),
+        glm::vec3(300.0f, 300.0f, 300.0f)};
 
     // finish
     // Configure global opengl state
@@ -515,87 +516,68 @@ int main()
         glBufferSubData(GL_UNIFORM_BUFFER, sizeof(glm::mat4), sizeof(glm::mat4), glm::value_ptr(view));
         glBindBuffer(GL_UNIFORM_BUFFER, 0);
 
-        // Rendering - render to G framebuffer
-        glBindFramebuffer(GL_FRAMEBUFFER, gBufferFBO);
-        glClearColor(0.01f, 0.01f, 0.2f, 1.0f);
+        // Rendering - render to default framebuffer
+        glClearColor(0.01f, 0.01f, 0.1f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         // Disable culling to render cube from inside
-        glDisable(GL_CULL_FACE);
+        // glDisable(GL_CULL_FACE);
 
-        shaderGBufferPass.use();
+        shaderPBRDirectLighting.use();
 
-        // set object positions
-        for (unsigned int i = 0; i < objectPositions.size(); i++)
+        shaderPBRDirectLighting.setVec3("viewPos", camera.Position);
+
+        shaderPBRDirectLighting.setVec3("albedo", cubeColor);
+        shaderPBRDirectLighting.setFloat("mettalic", mettalicValue);
+        shaderPBRDirectLighting.setFloat("roughness", roughnessValue);
+        shaderPBRDirectLighting.setFloat("ao", aoValue);
+
+        // for (int i = 0; i < nrRows * nrColumns; i++)
+        // {
+        //     shaderPBRDirectLighting.setFloat("metallic", mettalicValue);
+        //     shaderPBRDirectLighting.setFloat("roughness", roughnessValue);
+        //     model = glm::mat4(1.0f);
+        //     model = glm::translate(model, glm::vec3((i % nrColumns) * (spacing), (int)(i / nrRows) * (spacing), 0.0f));
+        //     shaderPBRDirectLighting.setMat4("model", model);
+        //     renderSphere();
+        // }
+        model = glm::mat4(1.0f);
+        for (int row = 0; row < nrRows; ++row) 
         {
+            shaderPBRDirectLighting.setFloat("metallic", (float)row / (float)nrRows);
+            for (int col = 0; col < nrColumns; ++col) 
+            {
+                // we clamp the roughness to 0.05 - 1.0 as perfectly smooth surfaces (roughness of 0.0) tend to look a bit off
+                // on direct lighting.
+                shaderPBRDirectLighting.setFloat("roughness", glm::clamp((float)col / (float)nrColumns, 0.05f, 1.0f));
+                
+                model = glm::mat4(1.0f);
+                model = glm::translate(model, glm::vec3(
+                    (col - (nrColumns / 2)) * spacing, 
+                    (row - (nrRows / 2)) * spacing, 
+                    0.0f
+                ));
+                shaderPBRDirectLighting.setMat4("model", model);
+                // shaderPBRDirectLighting.setMat3("normalMatrix", glm::transpose(glm::inverse(glm::mat3(model))));
+                renderSphere();
+            }
+        }
+
+        // render lights
+        for (int i = 0; i < sizeof(lightPositions) / sizeof(lightPositions[0]); i++)
+        {
+            glm::vec3 newPos = lightPositions[i] + glm::vec3(sin(static_cast<float>(glfwGetTime()) * 5.0f) * 5.0f, 0.0f, 0.0f);
+            newPos = lightPositions[i];
+            shaderPBRDirectLighting.setVec3("lightPositions[" + std::to_string(i) + "]", newPos);
+            shaderPBRDirectLighting.setVec3("lightColors[" + std::to_string(i) + "]", lightColors[i]);
+
             model = glm::mat4(1.0f);
-            model = glm::translate(model, objectPositions[i]);
+            model = glm::translate(model, newPos);
             model = glm::scale(model, glm::vec3(0.5f));
-            shaderGBufferPass.setMat4("model", model);
-            backpackModel.Draw(shaderGBufferPass);
+            shaderPBRDirectLighting.setMat4("model", model);
+            // shaderPBRDirectLighting.setMat3("normalMatrix", glm::transpose(glm::inverse(glm::mat3(model))));
+            renderSphere();
         }
-
-        glBindFramebuffer(GL_FRAMEBUFFER, 0);
-        glClearColor(0.2f, 0.01f, 0.01f, 1.0f);
-        glBindFramebuffer(GL_FRAMEBUFFER, ssaoFBO);
-        glClear(GL_COLOR_BUFFER_BIT);
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, gPosition);
-        glActiveTexture(GL_TEXTURE1);
-        glBindTexture(GL_TEXTURE_2D, gNormal);
-        glActiveTexture(GL_TEXTURE2);
-        glBindTexture(GL_TEXTURE_2D, noiseTexture);
-        shaderSsao.use();
-        // kernel to shader uniforms
-        for (int i = 0; i < kernelSize; i++)
-            shaderSsao.setVec3("samples[" + std::to_string(i) + "]", ssaoKernel[i]);
-        // uniforms
-        shaderSsao.setMat4("projection", projection);
-        shaderSsao.setInt("width", screen_width);
-        shaderSsao.setInt("height", screen_height);
-        shaderSsao.setInt("kernelSize", kernelSize);
-        shaderSsao.setFloat("radius", hemisphereRadius);
-        shaderSsao.setFloat("bias", ambientOcclusionBias);
-        shaderSsao.setFloat("occlusionPower", occlusionPower);
-        shaderSsao.setFloat("simpleTangent", useSimpleTangent);
-        renderQuad();
-
-        glBindFramebuffer(GL_FRAMEBUFFER, 0);
-        // blur pass
-        if (blurSsaoEnabled)
-        {
-            glBindFramebuffer(GL_FRAMEBUFFER, ssaoBlurPassFBO);
-            glClear(GL_COLOR_BUFFER_BIT);
-            glActiveTexture(GL_TEXTURE0);
-            glBindTexture(GL_TEXTURE_2D, ssaoColorBuffer);
-            shaderPostprocess.use();
-            renderQuad();
-        }
-        glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
-        // render quad aplying light pass
-        glBindFramebuffer(GL_FRAMEBUFFER, 0);
-        
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-        shaderLightingPass.use();
-        // send
-        glm::vec3 lightPosView = glm::vec3(camera.GetViewMatrix() * glm::vec4(lightPos, 1.0));
-        shaderLightingPass.setVec3("light.Position", lightPosView);
-        shaderLightingPass.setVec3("light.Color", lightColor);
-        // update attenuation
-        shaderLightingPass.setFloat("light.Linear", lightLinear);
-        shaderLightingPass.setFloat("light.Quadratic", lightQuadratic);
-        shaderLightingPass.setFloat("shininess", shininess);
-        shaderLightingPass.setInt("ssaoEnabled", ssaoEnabled);
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, gPosition);
-        glActiveTexture(GL_TEXTURE1);
-        glBindTexture(GL_TEXTURE_2D, gNormal);
-        glActiveTexture(GL_TEXTURE2);
-        glBindTexture(GL_TEXTURE_2D, gAlbedoSpec);
-        glActiveTexture(GL_TEXTURE3); // add extra SSAO texture to lighting pass
-        glBindTexture(GL_TEXTURE_2D, blurSsaoEnabled ? ssaoBlurPassColorBuffer : ssaoColorBuffer);
-        renderQuad();
 
         // new frame for imgui
         imgui_frame_new();
@@ -671,6 +653,102 @@ void renderScene(Shader &shader)
     model = glm::scale(model, glm::vec3(0.75f));
     shader.setMat4("model", model);
     renderCube();
+}
+
+unsigned int sphereVAO = 0;
+unsigned int indexCount;
+void renderSphere()
+{   
+    if (sphereVAO == 0)
+    {
+        glGenVertexArrays(1, &sphereVAO);
+        std::vector<float> data;
+        unsigned int vbo, ebo;
+        glGenBuffers(1, &vbo);
+        glGenBuffers(1, &ebo);
+
+        std::vector<glm::vec3> positions;
+        std::vector<glm::vec2> uv;
+        std::vector<glm::vec3> normals;
+        std::vector<unsigned int> indices;
+
+        const unsigned int X_SEGMENTS = 64;
+        const unsigned int Y_SEGMENTS = 64;
+        const float PI = 3.1415926535f;
+
+        for (unsigned int x = 0; x <= X_SEGMENTS; ++x)
+        {
+            for (unsigned int y = 0; y <= X_SEGMENTS; ++y)
+            {
+                float xSegment = (float)x / (float)X_SEGMENTS;
+                float ySegment = (float)y / (float)Y_SEGMENTS;
+                float xPos = std::cos(xSegment * 2.0f * PI) * std::sin(ySegment * PI);
+                float yPos = std::cos(ySegment * PI);
+                float zPos = std::sin(xSegment * 2.0f * PI) * std::sin(ySegment * PI);
+
+                positions.push_back(glm::vec3(xPos, yPos, zPos));
+                uv.push_back(glm::vec2(xSegment, ySegment));
+                normals.push_back(glm::vec3(xPos, yPos, zPos));
+            }
+        }
+
+        bool oddRow = false;
+        for (int y = 0; y < Y_SEGMENTS; ++y)
+        {
+            if (!oddRow)
+            {
+                for (int x = 0; x <= X_SEGMENTS; ++x)
+                {
+                    indices.push_back(y * (X_SEGMENTS + 1) + x);
+                    indices.push_back((y + 1) * (X_SEGMENTS + 1) + 1 + x);
+                }
+            }
+            else
+            {
+                for (int x = X_SEGMENTS; x >= 0; --x)
+                {
+                    indices.push_back((y + 1) * (X_SEGMENTS + 1) + 1 + x);
+                    indices.push_back(y * (X_SEGMENTS + 1) + x);
+                }
+            }
+            oddRow = !oddRow;
+        }
+        indexCount = static_cast<unsigned int>(indices.size());
+        // data layouts
+        for (unsigned int i = 0; i < positions.size(); i++)
+        {
+            data.push_back(positions[i].x);
+            data.push_back(positions[i].y);
+            data.push_back(positions[i].z);
+            if (normals.size() > 0)
+            {
+                data.push_back(normals[i].x);
+                data.push_back(normals[i].y);
+                data.push_back(normals[i].z);
+            }
+            if (uv.size() > 0)
+            {
+                data.push_back(uv[i].x);
+                data.push_back(uv[i].y);
+            }
+        }
+        // data buffers
+        glBindVertexArray(sphereVAO);
+        glBindBuffer(GL_ARRAY_BUFFER, vbo);
+        glBufferData(GL_ARRAY_BUFFER, data.size() * sizeof(float), &data[0], GL_STATIC_DRAW);
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(unsigned int), &indices[0], GL_STATIC_DRAW);
+        unsigned int stride = (3 + 2 + 3) * sizeof(float);
+        glEnableVertexAttribArray(0);
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, stride, (void*) 0);
+        glEnableVertexAttribArray(1);
+        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, stride, (void*)(3 * sizeof(float)));
+        glEnableVertexAttribArray(2);
+        glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, stride, (void*)(6 * sizeof(float)));
+    }
+    // draw
+    glBindVertexArray(sphereVAO);
+    glDrawElements(GL_TRIANGLE_STRIP, indexCount, GL_UNSIGNED_INT, 0);
 }
 
 unsigned int cubeVAO = 0;
@@ -1021,6 +1099,13 @@ void imgui_frame_update()
         ImGui::SliderInt("Bloom iterations", &bloomIterations, 1, 100);
         ImGui::Checkbox("SSAO", &ssaoEnabled);
         ImGui::Checkbox("Back-Face Culling ", &faceCullingEnabled);
+    }
+    if (ImGui::CollapsingHeader("Material"))
+    {
+        ImGui::ColorEdit3("Color", (float *)&cubeColor);
+        ImGui::SliderFloat("Roughness", &roughnessValue, 0.0f, 1.0f);
+        ImGui::SliderFloat("Metallic", &mettalicValue, 0.0f, 1.0f);
+        ImGui::SliderFloat("Ambient Oclussion", &aoValue, 0.0f, 1.0f);
     }
     if (ImGui::CollapsingHeader("Light properties"))
     {
