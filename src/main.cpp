@@ -55,8 +55,8 @@ void imgui_frame_render();
 void imgui_frame_shutdown();
 
 // settings
-unsigned int screen_width = 800;
-unsigned int screen_height = 600;
+unsigned int screen_width = 1280;
+unsigned int screen_height = 720;
 
 // Camera
 glm::vec3 cameraPos = glm::vec3(0.0f, 0.0f, 3.0f);
@@ -248,14 +248,16 @@ int main()
     std::vector<std::string>
         faces = {"assets/textures/skybox/right.jpg", "assets/textures/skybox/left.jpg", "assets/textures/skybox/top.jpg", "assets/textures/skybox/bottom.jpg", "assets/textures/skybox/front.jpg", "assets/textures/skybox/back.jpg"};
     // Models
-    stbi_set_flip_vertically_on_load(true);
-    Model backpackModel("assets/objects/backpack/backpack.obj");
+    // stbi_set_flip_vertically_on_load(true);
+    // Model backpackModel("assets/objects/backpack/backpack.obj");
+    unsigned int albedo = loadTexture("assets/textures/pbr/rusted_iron/albedo.png");
+    unsigned int normal = loadTexture("assets/textures/pbr/rusted_iron/normal.png");
+    unsigned int metallic = loadTexture("assets/textures/pbr/rusted_iron/metallic.png");
+    unsigned int roughness = loadTexture("assets/textures/pbr/rusted_iron/roughness.png");
+    unsigned int ao = loadTexture("assets/textures/pbr/rusted_iron/ao.png");
     // Implementation
     Shader shaderGBufferPass("assets/shaders/ssaoGBufferWhiteScene.vert", "assets/shaders/ssaoGBufferWhiteScene.frag");
-    Shader shaderPBRDirectLighting("assets/shaders/pbrDirectLighting.vert", "assets/shaders/pbrDirectLighting.frag");
-    Shader shaderSsao("assets/shaders/ssaoProcessQuad.vert", "assets/shaders/ssaoProcessQuad.frag");
-    Shader shaderLightingPass("assets/shaders/ssaoLightingPass.vert", "assets/shaders/ssaoLightingPass.frag");
-    Shader shaderPostprocess("assets/shaders/ssaoProcessToBlur.vert", "assets/shaders/ssaoProcessToBlur.frag");
+    Shader shaderPBRDirectLighting("assets/shaders/pbrDirectLightingTextured.vert", "assets/shaders/pbrDirectLightingTextured.frag");
     Shader shaderRenderQuad("assets/shaders/framebuffersSimpleQuad.vert", "assets/shaders/framebuffersSimpleQuad.frag");
 
     // Configure shader for debug quad
@@ -263,23 +265,15 @@ int main()
     shaderGBufferPass.setInt("texture_diffuse1", 0);
     shaderGBufferPass.setInt("texture_specular1", 1);
 
-    shaderSsao.use();
-    shaderSsao.setInt("gPosition", 0);
-    shaderSsao.setInt("gNormal", 1);
-    shaderSsao.setInt("texNoise", 2);
-
+    shaderPBRDirectLighting.use();
+    shaderPBRDirectLighting.setInt("albedoMap", 0);
+    shaderPBRDirectLighting.setInt("normalMap", 1);
+    shaderPBRDirectLighting.setInt("metallicMap", 2);
+    shaderPBRDirectLighting.setInt("roughnessMap", 3);
+    shaderPBRDirectLighting.setInt("aoMap", 4);
     // Bind uniform block to binding point
     GLuint matricesIndex = glGetUniformBlockIndex(shaderGBufferPass.ID, "Matrices");
     glUniformBlockBinding(shaderGBufferPass.ID, matricesIndex, 0);
-
-    shaderLightingPass.use();
-    shaderLightingPass.setInt("gPosition", 0);
-    shaderLightingPass.setInt("gNormal", 1);
-    shaderLightingPass.setInt("gAlbedo", 2);
-    shaderLightingPass.setInt("ssao", 3);
-
-    shaderPostprocess.use();
-    shaderPostprocess.setInt("ssaoInput", 0);
 
     // UBO's
     // unsigned int uboMatrices;
@@ -526,11 +520,16 @@ int main()
         shaderPBRDirectLighting.use();
 
         shaderPBRDirectLighting.setVec3("viewPos", camera.Position);
-
-        shaderPBRDirectLighting.setVec3("albedo", cubeColor);
-        shaderPBRDirectLighting.setFloat("mettalic", mettalicValue);
-        shaderPBRDirectLighting.setFloat("roughness", roughnessValue);
-        shaderPBRDirectLighting.setFloat("ao", aoValue);
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, albedo);
+        glActiveTexture(GL_TEXTURE1);
+        glBindTexture(GL_TEXTURE_2D, normal);
+        glActiveTexture(GL_TEXTURE2);
+        glBindTexture(GL_TEXTURE_2D, metallic);
+        glActiveTexture(GL_TEXTURE3);
+        glBindTexture(GL_TEXTURE_2D, roughness);
+        glActiveTexture(GL_TEXTURE4);
+        glBindTexture(GL_TEXTURE_2D, ao);
 
         // for (int i = 0; i < nrRows * nrColumns; i++)
         // {
@@ -542,21 +541,17 @@ int main()
         //     renderSphere();
         // }
         model = glm::mat4(1.0f);
-        for (int row = 0; row < nrRows; ++row) 
+        for (int row = 0; row < nrRows; ++row)
         {
-            shaderPBRDirectLighting.setFloat("metallic", (float)row / (float)nrRows);
-            for (int col = 0; col < nrColumns; ++col) 
+            for (int col = 0; col < nrColumns; ++col)
             {
                 // we clamp the roughness to 0.05 - 1.0 as perfectly smooth surfaces (roughness of 0.0) tend to look a bit off
                 // on direct lighting.
-                shaderPBRDirectLighting.setFloat("roughness", glm::clamp((float)col / (float)nrColumns, 0.05f, 1.0f));
-                
                 model = glm::mat4(1.0f);
                 model = glm::translate(model, glm::vec3(
-                    (col - (nrColumns / 2)) * spacing, 
-                    (row - (nrRows / 2)) * spacing, 
-                    0.0f
-                ));
+                                                  (col - (nrColumns / 2)) * spacing,
+                                                  (row - (nrRows / 2)) * spacing,
+                                                  0.0f));
                 shaderPBRDirectLighting.setMat4("model", model);
                 // shaderPBRDirectLighting.setMat3("normalMatrix", glm::transpose(glm::inverse(glm::mat3(model))));
                 renderSphere();
@@ -658,7 +653,7 @@ void renderScene(Shader &shader)
 unsigned int sphereVAO = 0;
 unsigned int indexCount;
 void renderSphere()
-{   
+{
     if (sphereVAO == 0)
     {
         glGenVertexArrays(1, &sphereVAO);
@@ -740,11 +735,11 @@ void renderSphere()
         glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(unsigned int), &indices[0], GL_STATIC_DRAW);
         unsigned int stride = (3 + 2 + 3) * sizeof(float);
         glEnableVertexAttribArray(0);
-        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, stride, (void*) 0);
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, stride, (void *)0);
         glEnableVertexAttribArray(1);
-        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, stride, (void*)(3 * sizeof(float)));
+        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, stride, (void *)(3 * sizeof(float)));
         glEnableVertexAttribArray(2);
-        glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, stride, (void*)(6 * sizeof(float)));
+        glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, stride, (void *)(6 * sizeof(float)));
     }
     // draw
     glBindVertexArray(sphereVAO);
