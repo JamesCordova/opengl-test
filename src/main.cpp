@@ -42,6 +42,7 @@ void mouse_callback(GLFWwindow *window, double xpos, double ypos);
 void scroll_callback(GLFWwindow *window, double xoffset, double yoffset);
 void processInput(GLFWwindow *window);
 unsigned int loadTexture(const char *path, bool gammaCorrection = false);
+unsigned int loadEnvironmentHDRMap(const char *path);
 unsigned int loadCubemap(std::vector<std::string> faces);
 
 void toggleCursor(GLFWwindow *window);
@@ -248,16 +249,18 @@ int main()
     std::vector<std::string>
         faces = {"assets/textures/skybox/right.jpg", "assets/textures/skybox/left.jpg", "assets/textures/skybox/top.jpg", "assets/textures/skybox/bottom.jpg", "assets/textures/skybox/front.jpg", "assets/textures/skybox/back.jpg"};
     // Models
-    // stbi_set_flip_vertically_on_load(true);
+    stbi_set_flip_vertically_on_load(true);
     // Model backpackModel("assets/objects/backpack/backpack.obj");
-    unsigned int albedo = loadTexture("assets/textures/pbr/rusted_iron/albedo.png");
-    unsigned int normal = loadTexture("assets/textures/pbr/rusted_iron/normal.png");
-    unsigned int metallic = loadTexture("assets/textures/pbr/rusted_iron/metallic.png");
-    unsigned int roughness = loadTexture("assets/textures/pbr/rusted_iron/roughness.png");
-    unsigned int ao = loadTexture("assets/textures/pbr/rusted_iron/ao.png");
+    // unsigned int albedo = loadTexture("assets/textures/pbr/rusted_iron/albedo.png");
+    // unsigned int normal = loadTexture("assets/textures/pbr/rusted_iron/normal.png");
+    // unsigned int metallic = loadTexture("assets/textures/pbr/rusted_iron/metallic.png");
+    // unsigned int roughness = loadTexture("assets/textures/pbr/rusted_iron/roughness.png");
+    // unsigned int ao = loadTexture("assets/textures/pbr/rusted_iron/ao.png");
+    unsigned int hdrTexture = loadEnvironmentHDRMap("assets/textures/hdr/newport_loft.hdr");
     // Implementation
     Shader shaderGBufferPass("assets/shaders/ssaoGBufferWhiteScene.vert", "assets/shaders/ssaoGBufferWhiteScene.frag");
-    Shader shaderPBRDirectLighting("assets/shaders/pbrDirectLightingTextured.vert", "assets/shaders/pbrDirectLightingTextured.frag");
+    Shader shaderPBRDirectLighting("assets/shaders/pbrDirectLighting.vert", "assets/shaders/pbrDirectLighting.frag");
+    Shader shaderEquirectangularToCube("assets/shaders/iblDiffuseCubemap.vert", "assets/shaders/iblDiffuseCubemap.frag");
     Shader shaderRenderQuad("assets/shaders/framebuffersSimpleQuad.vert", "assets/shaders/framebuffersSimpleQuad.frag");
 
     // Configure shader for debug quad
@@ -520,16 +523,7 @@ int main()
         shaderPBRDirectLighting.use();
 
         shaderPBRDirectLighting.setVec3("viewPos", camera.Position);
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, albedo);
-        glActiveTexture(GL_TEXTURE1);
-        glBindTexture(GL_TEXTURE_2D, normal);
-        glActiveTexture(GL_TEXTURE2);
-        glBindTexture(GL_TEXTURE_2D, metallic);
-        glActiveTexture(GL_TEXTURE3);
-        glBindTexture(GL_TEXTURE_2D, roughness);
-        glActiveTexture(GL_TEXTURE4);
-        glBindTexture(GL_TEXTURE_2D, ao);
+        shaderPBRDirectLighting.setVec3("albedo", cubeColor);
 
         // for (int i = 0; i < nrRows * nrColumns; i++)
         // {
@@ -541,17 +535,22 @@ int main()
         //     renderSphere();
         // }
         model = glm::mat4(1.0f);
+        // render rows*column number of spheres with varying metallic/roughness values scaled by rows and columns respectively
         for (int row = 0; row < nrRows; ++row)
         {
+            shaderPBRDirectLighting.setFloat("metallic", (float)row / (float)nrRows);
             for (int col = 0; col < nrColumns; ++col)
             {
-                // we clamp the roughness to 0.05 - 1.0 as perfectly smooth surfaces (roughness of 0.0) tend to look a bit off
+                // we clamp the roughness to 0.025 - 1.0 as perfectly smooth surfaces (roughness of 0.0) tend to look a bit off
                 // on direct lighting.
+                shaderPBRDirectLighting.setFloat("roughness", glm::clamp((float)col / (float)nrColumns, 0.05f, 1.0f));
+
                 model = glm::mat4(1.0f);
                 model = glm::translate(model, glm::vec3(
-                                                  (col - (nrColumns / 2)) * spacing,
-                                                  (row - (nrRows / 2)) * spacing,
-                                                  0.0f));
+                    (float)(col - (nrColumns / 2)) * spacing,
+                    (float)(row - (nrRows / 2)) * spacing,
+                    -2.0f
+                ));
                 shaderPBRDirectLighting.setMat4("model", model);
                 // shaderPBRDirectLighting.setMat3("normalMatrix", glm::transpose(glm::inverse(glm::mat3(model))));
                 renderSphere();
@@ -573,6 +572,12 @@ int main()
             // shaderPBRDirectLighting.setMat3("normalMatrix", glm::transpose(glm::inverse(glm::mat3(model))));
             renderSphere();
         }
+        shaderEquirectangularToCube.use();
+        shaderEquirectangularToCube.setMat4("view", view);
+        shaderEquirectangularToCube.setMat4("projection", projection);
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, hdrTexture);
+        renderCube();
 
         // new frame for imgui
         imgui_frame_new();
@@ -989,6 +994,31 @@ unsigned int loadTexture(const char *path, bool gammaCorrection)
     stbi_image_free(data);
 
     return textureID;
+}
+
+unsigned int loadEnvironmentHDRMap(const char *path)
+{
+    int width, height, nrComponents;
+    float *data = stbi_loadf(path, &width, &height, &nrComponents, 0);
+    if (!data)
+    {
+        std::cout << "Texture failed to load HDR image at path: " << path << std::endl;
+        return 0;
+    }
+    unsigned int hdrTextureID;
+    glGenTextures(1, &hdrTextureID);
+    glBindTexture(GL_TEXTURE_2D, hdrTextureID);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, width, height, 0, GL_RGB, GL_FLOAT, data);
+
+    // wrapping
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    // filtering
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+    stbi_image_free(data);
+    return hdrTextureID;
 }
 
 unsigned int loadCubemap(std::vector<std::string> faces)
