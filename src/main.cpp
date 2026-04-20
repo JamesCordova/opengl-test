@@ -261,6 +261,7 @@ int main()
     Shader shaderGBufferPass("assets/shaders/ssaoGBufferWhiteScene.vert", "assets/shaders/ssaoGBufferWhiteScene.frag");
     Shader shaderPBRDirectLighting("assets/shaders/pbrDirectLighting.vert", "assets/shaders/pbrDirectLighting.frag");
     Shader shaderEquirectangularToCube("assets/shaders/iblDiffuseCubemap.vert", "assets/shaders/iblDiffuseCubemap.frag");
+    Shader shaderSkybox("assets/shaders/iblDiffuseSkybox.vert", "assets/shaders/iblDiffuseSkybox.frag");
     Shader shaderRenderQuad("assets/shaders/framebuffersSimpleQuad.vert", "assets/shaders/framebuffersSimpleQuad.frag");
 
     // Configure shader for debug quad
@@ -277,6 +278,65 @@ int main()
     // Bind uniform block to binding point
     GLuint matricesIndex = glGetUniformBlockIndex(shaderGBufferPass.ID, "Matrices");
     glUniformBlockBinding(shaderGBufferPass.ID, matricesIndex, 0);
+
+    // pbr: setup framebuffer IBL Diffuse
+    unsigned int captureFBO, captureRBO;
+    glGenFramebuffers(1, &captureFBO);
+    glGenRenderbuffers(1, &captureRBO);
+
+    int widthCapture = 512, heightCapture = 512;
+    glBindFramebuffer(GL_FRAMEBUFFER, captureFBO);
+    glBindRenderbuffer(GL_RENDERBUFFER, captureRBO);
+    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, widthCapture, heightCapture);
+    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, captureRBO);
+
+    // pbr: ibl cubemap to render and attach to framebuffer
+    unsigned int envCubemap;
+    glGenTextures(1, &envCubemap);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, envCubemap);
+    for (unsigned int i = 0; i < 6; ++i)
+    {
+        // note that we store each face with 16 bit floating point values
+        glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB16F, widthCapture, heightCapture, 0, GL_RGB, GL_FLOAT, nullptr);
+    }
+    // wrapping
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+    // filtering
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+    // pbr: ibl set up projection and view matrices, 6 faces directions
+    glm::mat4 captureProjection = glm::perspective(glm::radians(90.0f), 1.0f, 0.1f, 10.0f);
+    glm::mat4 captureViews[] =
+    {
+        glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(1.0f, 0.0f, 0.0f), glm::vec3(0.0f, -1.0f, 0.0f)),
+        glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(-1.0f, 0.0f, 0.0f), glm::vec3(0.0f, -1.0f, 0.0f)),
+        glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f)),
+        glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, -1.0f, 0.0f), glm::vec3(0.0f, 0.0f, -1.0f)),
+        glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f), glm::vec3(0.0f, -1.0f, 0.0f)),
+        glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, -1.0f), glm::vec3(0.0f, -1.0f, 0.0f))
+    };
+
+    // convert from HDR equirectangular map
+    shaderEquirectangularToCube.use();
+    shaderEquirectangularToCube.setInt("equirectangularMap", 0);
+    shaderEquirectangularToCube.setMat4("projection", captureProjection);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, hdrTexture);
+
+    glViewport(0, 0, widthCapture, heightCapture);
+    glBindFramebuffer(GL_FRAMEBUFFER, captureFBO);
+    for (unsigned int i = 0; i < 6; ++i)
+    {
+        shaderEquirectangularToCube.setMat4("view", captureViews[i]);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, envCubemap, 0);
+
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        renderCube();
+    }
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
     // UBO's
     // unsigned int uboMatrices;
@@ -483,6 +543,7 @@ int main()
     // glEnable(GL_MULTISAMPLE);
 
     // mouse input, set cursor to center of screen
+    glViewport(0, 0, screen_width, screen_height);
     glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
     glfwSwapBuffers(window);
@@ -578,6 +639,18 @@ int main()
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, hdrTexture);
         renderCube();
+        // skybox
+        glDepthFunc(GL_LEQUAL);
+        glCullFace(GL_FRONT);
+        shaderSkybox.use();
+        shaderSkybox.setMat4("view", view);
+        shaderSkybox.setMat4("projection", projection);
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_CUBE_MAP, envCubemap);
+        renderCube();
+        glCullFace(GL_BACK);
+        glDepthFunc(GL_LESS);
+
 
         // new frame for imgui
         imgui_frame_new();
