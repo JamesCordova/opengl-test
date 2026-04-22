@@ -262,6 +262,7 @@ int main()
     Shader shaderPBRDirectLighting("assets/shaders/pbrDirectLighting.vert", "assets/shaders/pbrDirectLighting.frag");
     Shader shaderEquirectangularToCube("assets/shaders/iblDiffuseCubemap.vert", "assets/shaders/iblDiffuseCubemap.frag");
     Shader shaderSkybox("assets/shaders/iblDiffuseSkybox.vert", "assets/shaders/iblDiffuseSkybox.frag");
+    Shader shaderIrradianceConvolution("assets/shaders/iblDiffuseCubemapConvolution.vert", "assets/shaders/iblDiffuseCubemapConvolution.frag");
     Shader shaderRenderQuad("assets/shaders/framebuffersSimpleQuad.vert", "assets/shaders/framebuffersSimpleQuad.frag");
 
     // Configure shader for debug quad
@@ -337,6 +338,45 @@ int main()
         renderCube();
     }
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+    // PBR: IBL irradiance map
+    unsigned int widthMapConvolution = 32, heightMapConvolution = 32;
+    unsigned int irradianceMap;
+    glGenTextures(1, &irradianceMap);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, irradianceMap);
+    for (unsigned int i = 0; i < 6; ++i)
+    {
+        glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB16F, widthMapConvolution, heightMapConvolution, 0, GL_RGB, GL_FLOAT, nullptr);
+    }
+    // wrapping
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+    // filtering
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+    glBindFramebuffer(GL_FRAMEBUFFER, captureFBO);
+    glBindRenderbuffer(GL_RENDERBUFFER, captureRBO);
+    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, widthMapConvolution, heightMapConvolution);
+
+    shaderIrradianceConvolution.use();
+    shaderIrradianceConvolution.setInt("environmentMap", 0);
+    shaderIrradianceConvolution.setMat4("projection", captureProjection);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, envCubemap);
+
+    glViewport(0, 0, widthMapConvolution, heightMapConvolution);
+    glBindFramebuffer(GL_FRAMEBUFFER, captureFBO);
+    for (unsigned int i = 0; i < 6; ++i)
+    {
+        shaderIrradianceConvolution.setMat4("view", captureViews[i]);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, irradianceMap, 0);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        renderCube();
+    }
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
 
     // UBO's
     // unsigned int uboMatrices;
@@ -646,7 +686,7 @@ int main()
         shaderSkybox.setMat4("view", view);
         shaderSkybox.setMat4("projection", projection);
         glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_CUBE_MAP, envCubemap);
+        glBindTexture(GL_TEXTURE_CUBE_MAP, irradianceMap);
         renderCube();
         glCullFace(GL_BACK);
         glDepthFunc(GL_LESS);
