@@ -259,7 +259,7 @@ int main()
     unsigned int hdrTexture = loadEnvironmentHDRMap("assets/textures/hdr/newport_loft.hdr");
     // Implementation
     Shader shaderGBufferPass("assets/shaders/ssaoGBufferWhiteScene.vert", "assets/shaders/ssaoGBufferWhiteScene.frag");
-    Shader shaderPBRDirectLighting("assets/shaders/pbrDirectLighting.vert", "assets/shaders/pbrDirectLighting.frag");
+    Shader shaderPBRDirectLighting("assets/shaders/iblPbrDirectLighting.vert", "assets/shaders/iblPbrDirectLighting.frag");
     Shader shaderEquirectangularToCube("assets/shaders/iblDiffuseCubemap.vert", "assets/shaders/iblDiffuseCubemap.frag");
     Shader shaderSkybox("assets/shaders/iblDiffuseSkybox.vert", "assets/shaders/iblDiffuseSkybox.frag");
     Shader shaderIrradianceConvolution("assets/shaders/iblDiffuseCubemapConvolution.vert", "assets/shaders/iblDiffuseCubemapConvolution.frag");
@@ -686,7 +686,7 @@ int main()
         shaderSkybox.setMat4("view", view);
         shaderSkybox.setMat4("projection", projection);
         glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_CUBE_MAP, irradianceMap);
+        glBindTexture(GL_TEXTURE_CUBE_MAP, envCubemap);
         renderCube();
         glCullFace(GL_BACK);
         glDepthFunc(GL_LESS);
