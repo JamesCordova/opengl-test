@@ -673,12 +673,6 @@ int main()
             // shaderPBRDirectLighting.setMat3("normalMatrix", glm::transpose(glm::inverse(glm::mat3(model))));
             renderSphere();
         }
-        shaderEquirectangularToCube.use();
-        shaderEquirectangularToCube.setMat4("view", view);
-        shaderEquirectangularToCube.setMat4("projection", projection);
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, hdrTexture);
-        renderCube();
         // skybox
         glDepthFunc(GL_LEQUAL);
         glCullFace(GL_FRONT);
