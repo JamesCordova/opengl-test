@@ -34,7 +34,7 @@ void main()
             totalWeight += NdotL; 
         }
     }
-    prefilteredColor = prefilteredColor /= totalWeight;
+    prefilteredColor /= totalWeight;
     FragColor = vec4(prefilteredColor, 1.0);
 }
 
