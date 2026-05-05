@@ -89,7 +89,7 @@ bool blurSsaoEnabled = true;
 // animation
 float rotationSpeed = 50.0f; // degrees per second
 glm::vec3 mirrorCenterPos(0.0f, 0.5f, -4.5f);
-glm::vec3 cubeColor(1.0f, 0.5f, 0.31f);
+glm::vec3 cubeColor(0.9f, 0.9f, 0.9f);
 float mettalicValue = 0.0f;
 float roughnessValue = 0.0f;
 float aoValue = 1.0f;
@@ -260,7 +260,7 @@ int main()
     unsigned int hdrTexture = loadEnvironmentHDRMap("assets/textures/hdr/newport_loft.hdr");
     // Implementation
     Shader shaderGBufferPass("assets/shaders/ssaoGBufferWhiteScene.vert", "assets/shaders/ssaoGBufferWhiteScene.frag");
-    Shader shaderPBRDirectLighting("assets/shaders/iblPbrDirectLighting.vert", "assets/shaders/iblPbrDirectLighting.frag");
+    Shader shaderPBRDirectLighting("assets/shaders/iblPbrDirectLightingSpecularDiffuse.vert", "assets/shaders/iblPbrDirectLightingSpecularDiffuse.frag");
     Shader shaderEquirectangularToCube("assets/shaders/iblDiffuseCubemap.vert", "assets/shaders/iblDiffuseCubemap.frag");
     Shader shaderSpecularSkyboxTest("assets/shaders/iblSpecularSkyboxTest.vert", "assets/shaders/iblSpecularSkyboxTest.frag");
     Shader shaderSkybox("assets/shaders/iblDiffuseSkybox.vert", "assets/shaders/iblDiffuseSkybox.frag");
@@ -275,11 +275,14 @@ int main()
     shaderGBufferPass.setInt("texture_specular1", 1);
 
     shaderPBRDirectLighting.use();
-    shaderPBRDirectLighting.setInt("albedoMap", 0);
-    shaderPBRDirectLighting.setInt("normalMap", 1);
-    shaderPBRDirectLighting.setInt("metallicMap", 2);
-    shaderPBRDirectLighting.setInt("roughnessMap", 3);
-    shaderPBRDirectLighting.setInt("aoMap", 4);
+    shaderPBRDirectLighting.setInt("irradianceMap", 0);
+    shaderPBRDirectLighting.setInt("prefilterMap", 1);
+    shaderPBRDirectLighting.setInt("brdfLUT", 2);
+    shaderPBRDirectLighting.setInt("albedoMap", 3);
+    shaderPBRDirectLighting.setInt("normalMap", 4);
+    shaderPBRDirectLighting.setInt("metallicMap", 5);
+    shaderPBRDirectLighting.setInt("roughnessMap", 6);
+    shaderPBRDirectLighting.setInt("aoMap", 7);
     // Bind uniform block to binding point
     GLuint matricesIndex = glGetUniformBlockIndex(shaderGBufferPass.ID, "Matrices");
     glUniformBlockBinding(shaderGBufferPass.ID, matricesIndex, 0);
@@ -442,8 +445,10 @@ int main()
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    glBindFramebuffer(GL_FRAMEBUFFER, captureFBO);
+    glBindRenderbuffer(GL_RENDERBUFFER, captureRBO);
     glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, brdfLUTWidth, brdfLUTHeight);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, brdfLUTTexture, 0);
 
     glViewport(0, 0, brdfLUTWidth, brdfLUTHeight);
     shaderBrdfPrecomputing.use();
@@ -701,6 +706,13 @@ int main()
 
         shaderPBRDirectLighting.setVec3("viewPos", camera.Position);
         shaderPBRDirectLighting.setVec3("albedo", cubeColor);
+        shaderPBRDirectLighting.setFloat("ao", aoValue); // its obligatory needed to be 1.0
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_CUBE_MAP, irradianceMap);
+        glActiveTexture(GL_TEXTURE1);
+        glBindTexture(GL_TEXTURE_CUBE_MAP, prefilterMap);
+        glActiveTexture(GL_TEXTURE2);
+        glBindTexture(GL_TEXTURE_2D, brdfLUTTexture);
 
         // for (int i = 0; i < nrRows * nrColumns; i++)
         // {
