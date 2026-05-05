@@ -266,6 +266,7 @@ int main()
     Shader shaderSkybox("assets/shaders/iblDiffuseSkybox.vert", "assets/shaders/iblDiffuseSkybox.frag");
     Shader shaderIrradianceConvolution("assets/shaders/iblDiffuseCubemapConvolution.vert", "assets/shaders/iblDiffuseCubemapConvolution.frag");
     Shader shaderPrefilterCubemapPerRoughness("assets/shaders/iblPrefilterCubeMapPerRoughness.vert", "assets/shaders/iblPrefilterCubeMapPerRoughness.frag");
+    Shader shaderBrdfPrecomputing("assets/shaders/iblSpecularBRDFPrecomputed.vert", "assets/shaders/iblSpecularBRDFPrecomputed.frag");
     Shader shaderRenderQuad("assets/shaders/framebuffersSimpleQuad.vert", "assets/shaders/framebuffersSimpleQuad.frag");
 
     // Configure shader for debug quad
@@ -427,6 +428,30 @@ int main()
         } 
     }
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+    // IBL PBR Brdf Lut precomputing
+    unsigned int brdfLUTTexture;
+    glGenTextures(1, &brdfLUTTexture);
+
+    // pre allocate memory
+    glBindTexture(GL_TEXTURE_2D, brdfLUTTexture);
+    unsigned int brdfLUTWidth = 512, brdfLUTHeight = 512;
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RG16F, brdfLUTWidth, brdfLUTHeight, 0, GL_RG, GL_FLOAT, 0);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, brdfLUTWidth, brdfLUTHeight);
+
+    glViewport(0, 0, brdfLUTWidth, brdfLUTHeight);
+    shaderBrdfPrecomputing.use();
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    renderQuad();
+
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    
 
     // UBO's
     // unsigned int uboMatrices;
