@@ -121,6 +121,7 @@ int bloomType = 0;
 int bloomIterations = 10;
 float exposure = 1.0f;
 float gammaFactor = 2.2f;
+float roughnessSkybox = 0.0f;
 //////////////////
 unsigned int framebufferHDR;
 unsigned int colorBufferHDR[2];
@@ -261,8 +262,10 @@ int main()
     Shader shaderGBufferPass("assets/shaders/ssaoGBufferWhiteScene.vert", "assets/shaders/ssaoGBufferWhiteScene.frag");
     Shader shaderPBRDirectLighting("assets/shaders/iblPbrDirectLighting.vert", "assets/shaders/iblPbrDirectLighting.frag");
     Shader shaderEquirectangularToCube("assets/shaders/iblDiffuseCubemap.vert", "assets/shaders/iblDiffuseCubemap.frag");
+    Shader shaderSpecularSkyboxTest("assets/shaders/iblSpecularSkyboxTest.vert", "assets/shaders/iblSpecularSkyboxTest.frag");
     Shader shaderSkybox("assets/shaders/iblDiffuseSkybox.vert", "assets/shaders/iblDiffuseSkybox.frag");
     Shader shaderIrradianceConvolution("assets/shaders/iblDiffuseCubemapConvolution.vert", "assets/shaders/iblDiffuseCubemapConvolution.frag");
+    Shader shaderPrefilterCubemapPerRoughness("assets/shaders/iblPrefilterCubeMapPerRoughness.vert", "assets/shaders/iblPrefilterCubeMapPerRoughness.frag");
     Shader shaderRenderQuad("assets/shaders/framebuffersSimpleQuad.vert", "assets/shaders/framebuffersSimpleQuad.frag");
 
     // Configure shader for debug quad
@@ -377,6 +380,53 @@ int main()
     }
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
+    // IBL PBR Mapping yeah Prefilterd environment cubemap
+    int baseFilterMapWidth = 128, baseFilterMapHeight = 128;
+    unsigned int prefilterMap;
+    glGenTextures(1, &prefilterMap);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, prefilterMap);
+    for (unsigned int i = 0; i < 6; i++)
+    {
+        glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB16F, baseFilterMapWidth, baseFilterMapHeight, 0, GL_RGB, GL_FLOAT, nullptr);
+    }
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+    glGenerateMipmap(GL_TEXTURE_CUBE_MAP);
+
+    // Prefilter Run to Cubemap processed per roughness
+    shaderPrefilterCubemapPerRoughness.use();
+    shaderPrefilterCubemapPerRoughness.setInt("environmentMap", 0);
+    shaderPrefilterCubemapPerRoughness.setMat4("projection", captureProjection);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, envCubemap);
+
+    glBindFramebuffer(GL_FRAMEBUFFER, captureFBO);
+    unsigned int maxMipLevels = 5;
+    for (unsigned int mip = 0; mip < maxMipLevels; ++mip)
+    {
+        // resize framebuffer based on mip map level
+        unsigned int mipWidth = static_cast<int>(baseFilterMapWidth * pow(0.5, mip)); 
+        unsigned int mipHeight = static_cast<int>(baseFilterMapHeight * pow(0.5, mip));
+        glBindRenderbuffer(GL_RENDERBUFFER, captureRBO);
+        glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, mipWidth, mipHeight);
+        glViewport(0, 0, mipWidth, mipHeight);
+
+        float roughness = (float)mip / (float)(maxMipLevels - 1);
+        shaderPrefilterCubemapPerRoughness.setFloat("roughness", roughness);
+        for (unsigned int i = 0; i < 6; ++i)
+        {
+            shaderPrefilterCubemapPerRoughness.setMat4("view", captureViews[i]);
+            glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, prefilterMap, mip);
+
+            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+            renderCube();
+        } 
+    }
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
     // UBO's
     // unsigned int uboMatrices;
@@ -581,6 +631,7 @@ int main()
     // glCullFace(GL_FRONT);
     glEnable(GL_PROGRAM_POINT_SIZE);
     // glEnable(GL_MULTISAMPLE);
+    glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
 
     // mouse input, set cursor to center of screen
     glViewport(0, 0, screen_width, screen_height);
@@ -676,11 +727,12 @@ int main()
         // skybox
         glDepthFunc(GL_LEQUAL);
         glCullFace(GL_FRONT);
-        shaderSkybox.use();
-        shaderSkybox.setMat4("view", view);
-        shaderSkybox.setMat4("projection", projection);
+        shaderSpecularSkyboxTest.use();
+        shaderSpecularSkyboxTest.setFloat("roughness", roughnessSkybox);
+        shaderSpecularSkyboxTest.setMat4("view", view);
+        shaderSpecularSkyboxTest.setMat4("projection", projection);
         glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_CUBE_MAP, envCubemap);
+        glBindTexture(GL_TEXTURE_CUBE_MAP, prefilterMap);
         renderCube();
         glCullFace(GL_BACK);
         glDepthFunc(GL_LESS);
@@ -1231,6 +1283,7 @@ void imgui_frame_update()
         ImGui::SliderInt("Bloom iterations", &bloomIterations, 1, 100);
         ImGui::Checkbox("SSAO", &ssaoEnabled);
         ImGui::Checkbox("Back-Face Culling ", &faceCullingEnabled);
+        ImGui::SliderFloat("Roughness Skybox", &roughnessSkybox, 0.0f, 4.0f);
     }
     if (ImGui::CollapsingHeader("Material"))
     {
