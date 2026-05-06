@@ -121,7 +121,6 @@ int bloomType = 0;
 int bloomIterations = 10;
 float exposure = 1.0f;
 float gammaFactor = 2.2f;
-float roughnessSkybox = 0.0f;
 //////////////////
 unsigned int framebufferHDR;
 unsigned int colorBufferHDR[2];
@@ -764,12 +763,11 @@ int main()
         // skybox
         glDepthFunc(GL_LEQUAL);
         glCullFace(GL_FRONT);
-        shaderSpecularSkyboxTest.use();
-        shaderSpecularSkyboxTest.setFloat("roughness", roughnessSkybox);
-        shaderSpecularSkyboxTest.setMat4("view", view);
-        shaderSpecularSkyboxTest.setMat4("projection", projection);
+        shaderSkybox.use();
+        shaderSkybox.setMat4("view", view);
+        shaderSkybox.setMat4("projection", projection);
         glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_CUBE_MAP, prefilterMap);
+        glBindTexture(GL_TEXTURE_CUBE_MAP, envCubemap);
         renderCube();
         glCullFace(GL_BACK);
         glDepthFunc(GL_LESS);
@@ -1320,7 +1318,6 @@ void imgui_frame_update()
         ImGui::SliderInt("Bloom iterations", &bloomIterations, 1, 100);
         ImGui::Checkbox("SSAO", &ssaoEnabled);
         ImGui::Checkbox("Back-Face Culling ", &faceCullingEnabled);
-        ImGui::SliderFloat("Roughness Skybox", &roughnessSkybox, 0.0f, 4.0f);
     }
     if (ImGui::CollapsingHeader("Material"))
     {
