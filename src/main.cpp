@@ -251,15 +251,47 @@ int main()
     // Models
     stbi_set_flip_vertically_on_load(true);
     // Model backpackModel("assets/objects/backpack/backpack.obj");
-    // unsigned int albedo = loadTexture("assets/textures/pbr/rusted_iron/albedo.png");
-    // unsigned int normal = loadTexture("assets/textures/pbr/rusted_iron/normal.png");
-    // unsigned int metallic = loadTexture("assets/textures/pbr/rusted_iron/metallic.png");
-    // unsigned int roughness = loadTexture("assets/textures/pbr/rusted_iron/roughness.png");
-    // unsigned int ao = loadTexture("assets/textures/pbr/rusted_iron/ao.png");
+    
+    // Rusted iron PBR IBL Specular
+    unsigned int rustedIronAlbedo = loadTexture("assets/textures/pbr/rusted_iron/albedo.png");
+    unsigned int rustedIronNormal = loadTexture("assets/textures/pbr/rusted_iron/normal.png");
+    unsigned int rustedIronMetallic = loadTexture("assets/textures/pbr/rusted_iron/metallic.png");
+    unsigned int rustedIronRoughness = loadTexture("assets/textures/pbr/rusted_iron/roughness.png");
+    unsigned int rustedIronAo = loadTexture("assets/textures/pbr/rusted_iron/ao.png");
+
+    // Gold PBR IBL Specular
+    [[maybe_unused]] unsigned int goldAlbedo = loadTexture("assets/textures/pbr/gold/albedo.png");
+    [[maybe_unused]] unsigned int goldNormal = loadTexture("assets/textures/pbr/gold/normal.png");
+    [[maybe_unused]] unsigned int goldMetallic = loadTexture("assets/textures/pbr/gold/metallic.png");
+    [[maybe_unused]] unsigned int goldRoughness = loadTexture("assets/textures/pbr/gold/roughness.png");
+    [[maybe_unused]] unsigned int goldAo = loadTexture("assets/textures/pbr/gold/ao.png");
+
+    // Grass PBR IBL Specular
+    [[maybe_unused]] unsigned int grassAlbedo = loadTexture("assets/textures/pbr/grass/albedo.png");
+    [[maybe_unused]] unsigned int grassNormal = loadTexture("assets/textures/pbr/grass/normal.png");
+    [[maybe_unused]] unsigned int grassMetallic = loadTexture("assets/textures/pbr/grass/metallic.png");
+    [[maybe_unused]] unsigned int grassRoughness = loadTexture("assets/textures/pbr/grass/roughness.png");
+    [[maybe_unused]] unsigned int grassAo = loadTexture("assets/textures/pbr/grass/ao.png");
+
+    // Plastic PBR IBL Specular
+    [[maybe_unused]] unsigned int plasticAlbedo = loadTexture("assets/textures/pbr/plastic/albedo.png");
+    [[maybe_unused]] unsigned int plasticNormal = loadTexture("assets/textures/pbr/plastic/normal.png");
+    [[maybe_unused]] unsigned int plasticMetallic = loadTexture("assets/textures/pbr/plastic/metallic.png");
+    [[maybe_unused]] unsigned int plasticRoughness = loadTexture("assets/textures/pbr/plastic/roughness.png");
+    [[maybe_unused]] unsigned int plasticAo = loadTexture("assets/textures/pbr/plastic/ao.png");
+
+    // Wall PBR IBL Specular
+    [[maybe_unused]] unsigned int wallAlbedo = loadTexture("assets/textures/pbr/wall/albedo.png");
+    [[maybe_unused]] unsigned int wallNormal = loadTexture("assets/textures/pbr/wall/normal.png");
+    [[maybe_unused]] unsigned int wallMetallic = loadTexture("assets/textures/pbr/wall/metallic.png");
+    [[maybe_unused]] unsigned int wallRoughness = loadTexture("assets/textures/pbr/wall/roughness.png");
+    [[maybe_unused]] unsigned int wallAo = loadTexture("assets/textures/pbr/wall/ao.png");
+
     unsigned int hdrTexture = loadEnvironmentHDRMap("assets/textures/hdr/newport_loft.hdr");
     // Implementation
     Shader shaderGBufferPass("assets/shaders/ssaoGBufferWhiteScene.vert", "assets/shaders/ssaoGBufferWhiteScene.frag");
     Shader shaderPBRDirectLighting("assets/shaders/iblPbrDirectLightingSpecularDiffuse.vert", "assets/shaders/iblPbrDirectLightingSpecularDiffuse.frag");
+    Shader shaderPBRTextured("assets/shaders/iblPbrDirectLightingSpecularDiffuseTextured.vert", "assets/shaders/iblPbrDirectLightingSpecularDiffuseTextured.frag");
     Shader shaderEquirectangularToCube("assets/shaders/iblDiffuseCubemap.vert", "assets/shaders/iblDiffuseCubemap.frag");
     Shader shaderSpecularSkyboxTest("assets/shaders/iblSpecularSkyboxTest.vert", "assets/shaders/iblSpecularSkyboxTest.frag");
     Shader shaderSkybox("assets/shaders/iblDiffuseSkybox.vert", "assets/shaders/iblDiffuseSkybox.frag");
@@ -282,6 +314,16 @@ int main()
     shaderPBRDirectLighting.setInt("metallicMap", 5);
     shaderPBRDirectLighting.setInt("roughnessMap", 6);
     shaderPBRDirectLighting.setInt("aoMap", 7);
+
+    shaderPBRTextured.use();
+    shaderPBRTextured.setInt("irradianceMap", 0);
+    shaderPBRTextured.setInt("prefilterMap", 1);
+    shaderPBRTextured.setInt("brdfLUT", 2);
+    shaderPBRTextured.setInt("albedoMap", 3);
+    shaderPBRTextured.setInt("normalMap", 4);
+    shaderPBRTextured.setInt("metallicMap", 5);
+    shaderPBRTextured.setInt("roughnessMap", 6);
+    shaderPBRTextured.setInt("aoMap", 7);
     // Bind uniform block to binding point
     GLuint matricesIndex = glGetUniformBlockIndex(shaderGBufferPass.ID, "Matrices");
     glUniformBlockBinding(shaderGBufferPass.ID, matricesIndex, 0);
@@ -760,6 +802,98 @@ int main()
             // shaderPBRDirectLighting.setMat3("normalMatrix", glm::transpose(glm::inverse(glm::mat3(model))));
             renderSphere();
         }
+
+        // PBR IBL shader
+        shaderPBRTextured.use();
+        shaderPBRTextured.setVec3("viewPos", camera.Position);
+
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_CUBE_MAP, irradianceMap);
+        glActiveTexture(GL_TEXTURE1);
+        glBindTexture(GL_TEXTURE_CUBE_MAP, prefilterMap);
+        glActiveTexture(GL_TEXTURE2);
+        glBindTexture(GL_TEXTURE_2D, brdfLUTTexture);
+
+        // Rusted iron
+        glActiveTexture(GL_TEXTURE3);
+        glBindTexture(GL_TEXTURE_2D, rustedIronAlbedo);
+        glActiveTexture(GL_TEXTURE4);
+        glBindTexture(GL_TEXTURE_2D, rustedIronNormal);
+        glActiveTexture(GL_TEXTURE5);
+        glBindTexture(GL_TEXTURE_2D, rustedIronMetallic);
+        glActiveTexture(GL_TEXTURE6);
+        glBindTexture(GL_TEXTURE_2D, rustedIronRoughness);
+        glActiveTexture(GL_TEXTURE7);
+        glBindTexture(GL_TEXTURE_2D, rustedIronAo);
+        model = glm::mat4(1.0f);
+        model = glm::translate(model, glm::vec3(-5.0f, 0.0f, 2.0f));
+        shaderPBRTextured.setMat4("model", model);
+        renderSphere();
+
+        // Gold
+        glActiveTexture(GL_TEXTURE3);
+        glBindTexture(GL_TEXTURE_2D, goldAlbedo);
+        glActiveTexture(GL_TEXTURE4);
+        glBindTexture(GL_TEXTURE_2D, goldNormal);
+        glActiveTexture(GL_TEXTURE5);
+        glBindTexture(GL_TEXTURE_2D, goldMetallic);
+        glActiveTexture(GL_TEXTURE6);
+        glBindTexture(GL_TEXTURE_2D, goldRoughness);
+        glActiveTexture(GL_TEXTURE7);
+        glBindTexture(GL_TEXTURE_2D, goldAo);
+        model = glm::mat4(1.0f);
+        model = glm::translate(model, glm::vec3(-3.0f, 0.0f, 2.0f));
+        shaderPBRTextured.setMat4("model", model);
+        renderSphere();
+
+        // Grass
+        glActiveTexture(GL_TEXTURE3);
+        glBindTexture(GL_TEXTURE_2D, grassAlbedo);
+        glActiveTexture(GL_TEXTURE4);
+        glBindTexture(GL_TEXTURE_2D, grassNormal);
+        glActiveTexture(GL_TEXTURE5);
+        glBindTexture(GL_TEXTURE_2D, grassMetallic);
+        glActiveTexture(GL_TEXTURE6);
+        glBindTexture(GL_TEXTURE_2D, grassRoughness);
+        glActiveTexture(GL_TEXTURE7);
+        glBindTexture(GL_TEXTURE_2D, grassAo);
+        model = glm::mat4(1.0f);
+        model = glm::translate(model, glm::vec3(-1.0f, 0.0f, 2.0f));
+        shaderPBRTextured.setMat4("model", model);
+        renderSphere();
+
+        // Plastic
+        glActiveTexture(GL_TEXTURE3);
+        glBindTexture(GL_TEXTURE_2D, plasticAlbedo);
+        glActiveTexture(GL_TEXTURE4);
+        glBindTexture(GL_TEXTURE_2D, plasticNormal);
+        glActiveTexture(GL_TEXTURE5);
+        glBindTexture(GL_TEXTURE_2D, plasticMetallic);
+        glActiveTexture(GL_TEXTURE6);
+        glBindTexture(GL_TEXTURE_2D, plasticRoughness);
+        glActiveTexture(GL_TEXTURE7);
+        glBindTexture(GL_TEXTURE_2D, plasticAo);
+        model = glm::mat4(1.0f);
+        model = glm::translate(model, glm::vec3(1.0f, 0.0f, 2.0f));
+        shaderPBRTextured.setMat4("model", model);
+        renderSphere();
+
+        // Wall
+        glActiveTexture(GL_TEXTURE3);
+        glBindTexture(GL_TEXTURE_2D, wallAlbedo);
+        glActiveTexture(GL_TEXTURE4);
+        glBindTexture(GL_TEXTURE_2D, wallNormal);
+        glActiveTexture(GL_TEXTURE5);
+        glBindTexture(GL_TEXTURE_2D, wallMetallic);
+        glActiveTexture(GL_TEXTURE6);
+        glBindTexture(GL_TEXTURE_2D, wallRoughness);
+        glActiveTexture(GL_TEXTURE7);
+        glBindTexture(GL_TEXTURE_2D, wallAo);
+        model = glm::mat4(1.0f);
+        model = glm::translate(model, glm::vec3(3.0f, 0.0f, 2.0f));
+        shaderPBRTextured.setMat4("model", model);
+        renderSphere();
+
         // skybox
         glDepthFunc(GL_LEQUAL);
         glCullFace(GL_FRONT);
