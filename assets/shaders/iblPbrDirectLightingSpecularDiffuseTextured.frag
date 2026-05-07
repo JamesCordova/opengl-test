@@ -33,7 +33,7 @@ vec3 getNormalMap();
 
 void main()
 {
-    vec3 albedo = texture(albedoMap, fs_in.TexCoords).rgb; // needs fix TODO gamma correction
+    vec3 albedo = pow(texture(albedoMap, fs_in.TexCoords).rgb, vec3(2.2)); // needs fix TODO gamma correction
     float metallic = texture(metallicMap, fs_in.TexCoords).r;
     float roughness = texture(roughnessMap, fs_in.TexCoords).r;
     float ao = texture(aoMap, fs_in.TexCoords).r;
