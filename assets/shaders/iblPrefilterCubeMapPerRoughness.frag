@@ -11,6 +11,7 @@ const float PI = 3.14159265359;
 float RadicalInverse_VdC(uint bits);
 vec2 Hammersley(uint i, uint N);
 vec3 ImportanceSampling(vec2 Xi, vec3 N, float roughness);
+float DistributionGGX(vec3 N, vec3 H, float roughness);
 
 void main()
 {
@@ -30,7 +31,19 @@ void main()
         float NdotL = max(dot(N, L), 0.0);
         if (NdotL > 0.0)
         {
-            prefilteredColor += texture(environmentMap, L).rgb * NdotL;
+            // sample fron enviroment to try get to know if we need some blurry mipmap level
+            // to avoid bright dots because of random samples
+            float D = DistributionGGX(N, H, roughness);
+            float NdotH = max(dot(N, H), 0.0);
+            float HdotV = max(dot(H, V), 0.0);
+            float pdf = (D * NdotH / (4.0 * HdotV)) + 0.0001;
+
+            float resolution = 512.0;
+            float saTexel = 4.0 * PI / (6.0 * resolution * resolution);
+            float saSample = 1.0 / (float(SAMPLE_COUNT) * pdf + 0.0001);
+
+            float mipLevel = roughness == 0.0 ? 0.0 : 0.5 * log2(saSample / saTexel); 
+            prefilteredColor += textureLod(environmentMap, L, mipLevel).rgb * NdotL;
             totalWeight += NdotL; 
         }
     }
@@ -74,4 +87,18 @@ vec3 ImportanceSampling(vec2 Xi, vec3 N, float roughness)
 
     vec3 sampleVec = tangent * H.x + bitangent * H.y + N * H.z;
     return normalize(sampleVec);
+}
+
+float DistributionGGX(vec3 N, vec3 H, float roughness)
+{
+    float a = roughness * roughness;
+    float a_2 = a * a;
+    float NdotH = max(dot(N, H), 0.0);
+    float NdotH_2 = NdotH * NdotH;
+
+    float numerator = a_2;
+    float denominator = (NdotH_2 * (a_2 - 1.0) + 1.0);
+    denominator = PI * denominator * denominator;
+
+    return numerator / denominator;
 }
