@@ -12,4 +12,4 @@
 	url = https://github.com/assimp/assimp.git
 [submodule "thirdparty/freetype"]
 	path = thirdparty/freetype
-	url = https://gitlab.freedesktop.org/freetype/freetype
+	url = https://gitlab.freedesktop.org/freetype/freetype.git
