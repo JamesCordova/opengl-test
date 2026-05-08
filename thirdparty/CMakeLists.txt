@@ -49,6 +49,16 @@ if (MSVC)
 endif()
 FetchContent_MakeAvailable(assimp)
 
+FetchContent_Declare(
+    freetype
+    GIT_REPOSITORY  https://gitlab.freedesktop.org/freetype/freetype.git
+    GIT_TAG         0a0221a1347e2f1e07c395263540026e9a0aa7c7 #refs/tags/VER-2-14-3
+    GIT_SHALLOW     TRUE
+    SOURCE_DIR      ${CMAKE_CURRENT_SOURCE_DIR}/freetype
+)
+
+FetchContent_MakeAvailable(freetype)
+
 add_subdirectory(imgui-cmake) # Needs building
 
 add_subdirectory(glad)
