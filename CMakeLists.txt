@@ -21,6 +21,7 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
   glm 
   imgui
   assimp
+  freetype
 )
 
 if(MSVC)
