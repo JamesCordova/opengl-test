@@ -1016,6 +1016,12 @@ int main()
         shaderTextRendering.use();
         shaderTextRendering.setMat4("projection", orthographic_projection);
         
+        // This is somewhat dynamic, se trata cualquier ventana bajo las dimensiones iniciales
+        // asi que si algo esta en medio lo seguira estando pero todo se estirara.
+        // Para hacerlo realmente dinamico tendriamos que ponder datos entre 0 a 1
+        // Además de estar multiplicados por las dimensiones cambiados
+        // obviamente el ortographic projection debe ser actualizado
+        // renderText(shaderTextRendering, "This is a sample", screen_width *  0.25f, screen_height *  0.9f, 0.5f, lightGreen);
         glm::vec3 lightBlue = glm::vec3(0.5f, 0.8f, 0.2f);
         glm::vec3 lightGreen = glm::vec3(0.3f, 0.7f, 0.9f);
         renderText(shaderTextRendering, "This is a sample", 25.0f, 25.0f, 1.0f, lightBlue);
@@ -1100,6 +1106,8 @@ void renderScene(Shader &shader)
 
 void renderText(Shader &shaderText, std::string text, float x, float y, float scale, glm::vec3 color)
 {
+    // Remeber this is not the performant method, we can send all  bitmap into a quad, instead of having
+    // one quad per letter is bad, even for spaces that doesnt sounds too well
     shaderText.use();
     shaderText.setVec3("textColor", color);
     glActiveTexture(GL_TEXTURE0);
