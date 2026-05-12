@@ -39,6 +39,7 @@ namespace FileSystem
 void framebuffer_size_callback(GLFWwindow *window, int width, int height);
 void updateProjection();
 void renderScene(Shader &shader);
+void renderText(Shader &shaderText, std::string text, float x, float y, float scale, glm::vec3 color);
 void renderCube();
 void renderQuad();
 void renderSphere();
@@ -317,6 +318,7 @@ int main()
     Shader shaderPrefilterCubemapPerRoughness("assets/shaders/iblPrefilterCubeMapPerRoughness.vert", "assets/shaders/iblPrefilterCubeMapPerRoughness.frag");
     Shader shaderBrdfPrecomputing("assets/shaders/iblSpecularBRDFPrecomputed.vert", "assets/shaders/iblSpecularBRDFPrecomputed.frag");
     Shader shaderRenderQuad("assets/shaders/framebuffersSimpleQuad.vert", "assets/shaders/framebuffersSimpleQuad.frag");
+    Shader shaderTextRendering("assets/shaders/textRendering.vert", "assets/shaders/textRendering.frag");
 
     // Configure shader for debug quad
     shaderGBufferPass.use();
@@ -763,7 +765,9 @@ int main()
     FT_Done_Face(face);
     FT_Done_FreeType(ft);
 
-    glm::mat4 orthographic_projection = glm::ortho(0.0f, 1.0f, 0.0f, 1.0f);
+    glm::mat4 orthographic_projection = glm::ortho(0.0f, (float)screen_width, 0.0f, (float)screen_height);
+    shaderTextRendering.use();
+    shaderTextRendering.setMat4("projection", orthographic_projection);
 
     // configure text VAO VBO
     glGenVertexArrays(1, &textVAO);
@@ -1007,6 +1011,16 @@ int main()
         glCullFace(GL_BACK);
         glDepthFunc(GL_LESS);
 
+        // Texting
+    
+        shaderTextRendering.use();
+        shaderTextRendering.setMat4("projection", orthographic_projection);
+        
+        glm::vec3 lightBlue = glm::vec3(0.5f, 0.8f, 0.2f);
+        glm::vec3 lightGreen = glm::vec3(0.3f, 0.7f, 0.9f);
+        renderText(shaderTextRendering, "This is a sample", 25.0f, 25.0f, 1.0f, lightBlue);
+        renderText(shaderTextRendering, "This is a sample", 540.0f, 570.0f, 0.5f, lightGreen);
+
 
         // new frame for imgui
         imgui_frame_new();
@@ -1082,6 +1096,50 @@ void renderScene(Shader &shader)
     model = glm::scale(model, glm::vec3(0.75f));
     shader.setMat4("model", model);
     renderCube();
+}
+
+void renderText(Shader &shaderText, std::string text, float x, float y, float scale, glm::vec3 color)
+{
+    shaderText.use();
+    shaderText.setVec3("textColor", color);
+    glActiveTexture(GL_TEXTURE0);
+    glBindVertexArray(textVAO);
+
+    // iterate through all characters
+    std::string::const_iterator c;
+    for (c = text.begin(); c != text.end(); c++)
+    {
+        Character ch = Characters[*c];
+        
+        float xpos = x + ch.Bearing.x * scale;
+        float ypos = y - (ch.Size.y - ch.Bearing.y) * scale;
+
+        float w = ch.Size.x * scale;
+        float h = ch.Size.y * scale;
+
+        // update VBO for each character
+        float vertices[6][4] = {
+            {xpos, ypos + h, 0.0, 0.0f},
+            {xpos, ypos, 0.0, 1.0f},
+            {xpos + w, ypos, 1.0, 1.0f},
+
+            {xpos, ypos + h, 0.0f, 0.0f},
+            {xpos + w, ypos, 1.0f, 1.0f},
+            {xpos + w, ypos + h, 1.0f, 0.0f},
+        };
+        // render glyph texture over quad
+        glBindTexture(GL_TEXTURE_2D, ch.TextureID);
+        // update content of VBO memory
+        glBindBuffer(GL_ARRAY_BUFFER, textVBO);
+        glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(vertices), vertices);
+        glBindBuffer(GL_ARRAY_BUFFER, 0);
+        // render quad
+        glDrawArrays(GL_TRIANGLES, 0, 6);
+        // now advances cursors for the next glyph (advance is number of 1/64 pixels)
+        x += (ch.Advance >> 6) * scale;
+    }
+    glBindVertexArray(0);
+    glBindTexture(GL_TEXTURE_2D, 0);
 }
 
 unsigned int sphereVAO = 0;
