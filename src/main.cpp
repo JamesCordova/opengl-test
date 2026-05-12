@@ -158,6 +158,8 @@ struct Character
 
 // text renderer member
 std::map<char, Character> Characters;
+// Arrival
+unsigned int textVAO, textVBO;
 
 int main()
 {
@@ -752,7 +754,7 @@ int main()
             texture,
             glm::ivec2(face->glyph->bitmap.width, face->glyph->bitmap.rows),
             glm::ivec2(face->glyph->bitmap_left, face->glyph->bitmap_top),
-            face->glyph->advance.x
+            static_cast<unsigned int>(face->glyph->advance.x)
         };
 
         Characters.insert(std::pair<char, Character>(c, character));
@@ -760,6 +762,19 @@ int main()
     // Clear resources
     FT_Done_Face(face);
     FT_Done_FreeType(ft);
+
+    glm::mat4 orthographic_projection = glm::ortho(0.0f, 1.0f, 0.0f, 1.0f);
+
+    // configure text VAO VBO
+    glGenVertexArrays(1, &textVAO);
+    glGenBuffers(1, &textVBO);
+    glBindVertexArray(textVAO);
+    glBindBuffer(GL_ARRAY_BUFFER, textVBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(float) * 6 * 4, NULL, GL_DYNAMIC_DRAW);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 4 * sizeof(float), 0);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    glBindVertexArray(0);
 
     // positions
     glm::vec3 lightPositions[] = {
@@ -781,8 +796,8 @@ int main()
     // glDepthMask(GL_FALSE);
     glDepthFunc(GL_LESS); // change depth function so depth test passes when values are equal to depth buffer's content
     // blending
-    // glEnable(GL_BLEND);
-    // glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     // backface culling
     glEnable(GL_CULL_FACE);
     // glCullFace(GL_FRONT);
