@@ -5,6 +5,9 @@
 #include "learnopengl/shader.h"
 
 // third-party libraries
+#include <ft2build.h>
+#include FT_FREETYPE_H
+
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 
@@ -674,6 +677,29 @@ int main()
     objectPositions.push_back(glm::vec3(-3.0, -0.5, 3.0));
     objectPositions.push_back(glm::vec3(0.0, -0.5, 3.0));
     objectPositions.push_back(glm::vec3(3.0, -0.5, 3.0));
+
+    // Freetype boilerplate
+    FT_Library ft;
+    if (FT_Init_FreeType(&ft))
+    {
+        std::cout << "ERROR::FREETYPE: Could not init Freetype Library\n";
+        return -1;
+    }
+
+    FT_Face face;
+    if (FT_New_Face(ft, "assets/fonts/Antonio-Bold.ttf", 0, &face))
+    {
+        std::cout << "ERROR::FREETYPE: Failed to load Font\n";
+        return -1;
+    }
+
+    FT_Set_Pixel_Sizes(face, 0, 48);
+
+    if (FT_Load_Char(face, 'X', FT_LOAD_RENDER))
+    {
+        std::cout << "ERROR::FREETYPE: Failed to load Glyph\n";
+        return -1;
+    }
 
     // positions
     glm::vec3 lightPositions[] = {
