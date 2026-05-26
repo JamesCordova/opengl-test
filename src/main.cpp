@@ -79,7 +79,7 @@ float occlusionPower = 1.0f;
 // Game state
 bool cursorEnabled = false;
 bool wireframeEnabled = false;
-bool faceCullingEnabled = true;
+bool faceCullingEnabled = false;
 bool gammaEnabled = true;
 bool ssaoEnabled = true;
 bool useSimpleTangent = false;
@@ -289,7 +289,6 @@ int main()
 
     unsigned int hdrTexture = loadEnvironmentHDRMap("assets/textures/hdr/newport_loft.hdr");
     // Implementation
-    Shader shaderGBufferPass("assets/shaders/ssaoGBufferWhiteScene.vert", "assets/shaders/ssaoGBufferWhiteScene.frag");
     Shader shaderPBRDirectLighting("assets/shaders/iblPbrDirectLightingSpecularDiffuse.vert", "assets/shaders/iblPbrDirectLightingSpecularDiffuse.frag");
     Shader shaderPBRTextured("assets/shaders/iblPbrDirectLightingSpecularDiffuseTextured.vert", "assets/shaders/iblPbrDirectLightingSpecularDiffuseTextured.frag");
     Shader shaderEquirectangularToCube("assets/shaders/iblDiffuseCubemap.vert", "assets/shaders/iblDiffuseCubemap.frag");
@@ -299,11 +298,11 @@ int main()
     Shader shaderPrefilterCubemapPerRoughness("assets/shaders/iblPrefilterCubeMapPerRoughness.vert", "assets/shaders/iblPrefilterCubeMapPerRoughness.frag");
     Shader shaderBrdfPrecomputing("assets/shaders/iblSpecularBRDFPrecomputed.vert", "assets/shaders/iblSpecularBRDFPrecomputed.frag");
     Shader shaderRenderQuad("assets/shaders/framebuffersSimpleQuad.vert", "assets/shaders/framebuffersSimpleQuad.frag");
-
-    // Configure shader for debug quad
-    shaderGBufferPass.use();
-    shaderGBufferPass.setInt("texture_diffuse1", 0);
-    shaderGBufferPass.setInt("texture_specular1", 1);
+    // weighted blended
+    // Shader shaderSolid() // Done as PBR+IBL
+    Shader shaderTransparentPass("assets/shaders/oitWeightedBlendTransparentPass.vert", "assets/shaders/oitWeightedBlendTransparentPass.frag");
+    Shader shaderComposite("assets/shaders/oitWeightedBlendComposition.vert", "assets/shaders/oitWeightedBlendComposition.frag");
+    Shader shaderScreenQuad("assets/shaders/oitWeightedBlendQuadScreenPass.vert", "assets/shaders/oitWeightedBlendQuadScreenPass.frag");
 
     shaderPBRDirectLighting.use();
     shaderPBRDirectLighting.setInt("irradianceMap", 0);
@@ -325,8 +324,8 @@ int main()
     shaderPBRTextured.setInt("roughnessMap", 6);
     shaderPBRTextured.setInt("aoMap", 7);
     // Bind uniform block to binding point
-    GLuint matricesIndex = glGetUniformBlockIndex(shaderGBufferPass.ID, "Matrices");
-    glUniformBlockBinding(shaderGBufferPass.ID, matricesIndex, 0);
+    // GLuint matricesIndex = glGetUniformBlockIndex(shaderGBufferPass.ID, "Matrices");
+    // glUniformBlockBinding(shaderGBufferPass.ID, matricesIndex, 0);
 
     // pbr: setup framebuffer IBL Diffuse
     unsigned int captureFBO, captureRBO;
@@ -497,7 +496,74 @@ int main()
     renderQuad();
 
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
-    
+
+    // Framebuffers for OIT Weighted Blended Transparency
+    unsigned int opaqueFBO, transparentFBO;
+    glGenFramebuffers(1, &opaqueFBO);
+    glGenFramebuffers(1, &transparentFBO);
+
+    unsigned int opaqueTextureBuffer;
+    glGenTextures(1, &opaqueTextureBuffer);
+    glBindTexture(GL_TEXTURE_2D, opaqueTextureBuffer);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, screen_width, screen_height, 0, GL_RGBA, GL_HALF_FLOAT, NULL);
+    // filtering
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glBindTexture(GL_TEXTURE_2D, 0);
+
+    unsigned int depthTextureBuffer;
+    glGenTextures(1, &depthTextureBuffer);
+    glBindTexture(GL_TEXTURE_2D, depthTextureBuffer);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, screen_width, screen_height, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
+    glBindTexture(GL_TEXTURE_2D, 0);
+
+    //set up framebuffer opaque
+    glBindFramebuffer(GL_FRAMEBUFFER, opaqueFBO);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, opaqueTextureBuffer, 0);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depthTextureBuffer, 0);
+
+    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+        std::cout << "ERROR::FRAMEBUFFER: Opaque framebuffer is not complete";
+
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+    // ATTACHMENTS for transparent buffer
+    unsigned int accumTexture;
+    glGenTextures(1, &accumTexture);
+    glBindTexture(GL_TEXTURE_2D, accumTexture);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, screen_width, screen_height, 0, GL_RGBA, GL_HALF_FLOAT, NULL);
+    // filtering
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glBindTexture(GL_TEXTURE_2D, 0);
+
+    unsigned int revealTexture;
+    glGenTextures(1, &revealTexture);
+    glBindTexture(GL_TEXTURE_2D, revealTexture);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_R8, screen_width, screen_height, 0, GL_RED, GL_FLOAT, NULL);
+    // filtering
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glBindTexture(GL_TEXTURE_2D, 0);
+
+    //set up framebuffer transparent
+    glBindFramebuffer(GL_FRAMEBUFFER, transparentFBO);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, accumTexture, 0);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, revealTexture, 0);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depthTextureBuffer, 0);
+
+    const GLenum transparentDrawBuffers[] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1 };
+    glDrawBuffers(2, transparentDrawBuffers);
+
+    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+        std::cout << "ERROR::FRAMEBUFFER: Transparent framebuffer is not complete";
+
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+    // FILLERS
+    glm::vec4 zeroFillerVec(0.0f);
+    glm::vec4 oneFillerVec(1.0f);
+
 
     // UBO's
     // unsigned int uboMatrices;
@@ -695,7 +761,7 @@ int main()
     // glDepthMask(GL_FALSE);
     glDepthFunc(GL_LESS); // change depth function so depth test passes when values are equal to depth buffer's content
     // blending
-    // glEnable(GL_BLEND);
+    glEnable(GL_BLEND);
     // glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     // backface culling
     glEnable(GL_CULL_FACE);
@@ -737,6 +803,11 @@ int main()
         glBindBuffer(GL_UNIFORM_BUFFER, 0);
 
         // Rendering - render to default framebuffer
+        // glEnable(GL_DEPTH_TEST);
+        // glDepthFunc(GL_LESS);
+        // glDepthMask(GL_TRUE);
+        // glDisable(GL_BLEND);
+        glBindFramebuffer(GL_FRAMEBUFFER, opaqueFBO);
         glClearColor(0.01f, 0.01f, 0.1f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
@@ -905,6 +976,64 @@ int main()
         renderCube();
         glCullFace(GL_BACK);
         glDepthFunc(GL_LESS);
+
+        // transparent pass
+        // glDepthMask(GL_FALSE);
+        // glEnable(GL_BLEND);
+        glBlendFunci(0, GL_ONE, GL_ONE);
+        glBlendFunci(1, GL_ZERO, GL_ONE_MINUS_SRC_COLOR);
+        
+        glBindFramebuffer(GL_FRAMEBUFFER, transparentFBO);
+        glClearBufferfv(GL_COLOR, 0, &zeroFillerVec[0]);
+        glClearBufferfv(GL_COLOR, 1, &oneFillerVec[0]);
+
+        shaderTransparentPass.use();
+
+        // draw quads
+        // blue
+        model = glm::mat4(1.0f);
+        model = glm::translate(model, glm::vec3(0.0f, 0.0f, 0.0f));
+        shaderTransparentPass.setMat4("model", model);
+        shaderTransparentPass.setVec4("color", glm::vec4(0.0f, 1.0f, 0.0f, 0.5f));
+        renderQuad();
+
+        // green        
+        model = glm::mat4(1.0f);
+        model = glm::translate(model, glm::vec3(0.0f, 0.0f, 5.0f));
+        shaderTransparentPass.setMat4("model", model);
+        shaderTransparentPass.setVec4("color", glm::vec4(0.0f, 0.0f, 1.0f, 0.1f));
+        renderQuad();
+
+        // PASS TO THE COMPOSITE
+        // glDepthFunc(GL_ALWAYS);
+        // glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+        // bind 
+        glBindFramebuffer(GL_FRAMEBUFFER, opaqueFBO);
+
+        shaderComposite.use();
+
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, accumTexture);
+        glActiveTexture(GL_TEXTURE1);
+        glBindTexture(GL_TEXTURE_2D, revealTexture);
+        renderQuad();
+
+        // GO BACK TO DEFAULT STATES
+        // glDisable(GL_DEPTH_TEST);
+        // glDepthMask(GL_TRUE);
+        // glDisable(GL_BLEND);
+
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+        shaderScreenQuad.use();
+
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, opaqueTextureBuffer);
+        renderQuad();
 
 
         // new frame for imgui
